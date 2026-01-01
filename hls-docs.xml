@@ -1,0 +1,2833 @@
+<repomix><file_summary>This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+The content has been processed where content has been formatted for parsing in xml style.<purpose>This file contains a packed representation of a subset of the repository&apos;s contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.</purpose><file_format>The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Repository files, each consisting of:
+  - File path as an attribute
+  - Full contents of the file</file_format><usage_guidelines>- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.</usage_guidelines><notes>- Some files may have been excluded based on .gitignore rules and Repomix&apos;s configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: docs
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Content has been formatted for parsing in xml style
+- Files are sorted by Git change count (files with more changes are at the bottom)</notes></file_summary><directory_structure>docs/
+  _static/
+    .gitkeep
+    theme_overrides.css
+  _templates/
+    .gitkeep
+  components/
+    ghcide.md
+    index.rst
+  contributing/
+    contributing.md
+    imports.gif
+    index.rst
+    plugin-tutorial.md
+    settings-vscode.png
+  logos/
+    logo-1024.png
+    logo-128.png
+    logo-256.png
+    logo-32.png
+    logo-512.png
+    logo-64.png
+    logo.svg
+  support/
+    ghc-version-support.md
+    index.rst
+    plugin-support.md
+  .gitignore
+  conf.py
+  configuration.md
+  features.md
+  index.rst
+  installation.md
+  Makefile
+  requirements.txt
+  troubleshooting.md
+  what-is-hls.md</directory_structure><files>This section contains the contents of the repository&apos;s files.<file path="docs/_static/.gitkeep"></file><file path="docs/_static/theme_overrides.css">/* Fix table wrapping https://github.com/readthedocs/sphinx_rtd_theme/issues/117 */
+@media screen and (min-width: 768px) {
+	.wy-table-responsive table td, .wy-table-responsive table th {
+	  white-space: normal !important;
+	}
+}</file><file path="docs/_templates/.gitkeep"></file><file path="docs/components/ghcide.md"># `ghcide`
+
+[`ghcide`](https://hackage.haskell.org/package/ghcide) is a library for building Haskell IDE tooling.
+
+Our vision is that you should build an IDE by combining:
+
+![vscode](https://raw.githubusercontent.com/haskell/ghcide/master/img/vscode2.png)
+
+* [`hie-bios`](https://github.com/mpickering/hie-bios) for determining where your files are, what are their dependencies, what extensions are enabled and so on;
+* `ghcide` (i.e. this library) for defining how to type check, when to type check, and producing diagnostic messages;
+* A bunch of plugins that implement optional features, such as formatting, eval, linter (via `hlint`), etc...
+* [`haskell-lsp`](https://github.com/haskell/lsp) for sending those messages to a [Language Server Protocol (LSP)](https://microsoft.github.io/language-server-protocol/) server;
+* An LSP client for your editor.
+
+There are more details about our approach [in this blog post](https://4ta.uk/p/shaking-up-the-ide).
+
+## Limitations to Multi-Component support
+
+`ghcide` supports loading multiple components into the same session so that
+features such as go-to definition work across components. However, there are
+some limitations to this.
+
+1. You will get much better results currently manually specifying the hie.yaml file.
+Until tools like cabal and stack provide the right interface to support multi-component
+projects, it is always advised to specify explicitly how your project partitions.
+2. Cross-component features only work if you have loaded at least one file
+from each component.
+
+## Using it
+
+`ghcide` is not an end-user tool, [don&apos;t use `ghcide`](https://neilmitchell.blogspot.com/2020/09/dont-use-ghcide-anymore-directly.html) directly (more about the rationale [here](https://github.com/haskell/ghcide/pull/939)).
+
+ [`haskell-language-server`](http://github.com/haskell/haskell-language-server) is an LSP server built on top of `ghcide` with additional features and a user friendly deployment model. To get it, simply install the [Haskell extension](https://marketplace.visualstudio.com/items?itemName=haskell.haskell) in VS Code, or download prebuilt binaries from [GHCup](https://www.haskell.org/ghcup/).
+
+
+The instructions below are meant for developers interested in setting up ghcide as an LSP server for testing purposes.
+
+### Install `ghcide`
+
+
+#### With Cabal or Stack
+
+First install the `ghcide` binary using `stack` or `cabal`, e.g.
+
+1. `git clone https://github.com/haskell/haskell-language-server.git`
+2. `cd haskell-language-server`
+3. `cabal install exe:ghcide` or `stack install ghcide` (and make sure `~/.local/bin` is on your `$PATH`)
+
+It&apos;s important that `ghcide` is compiled with the same compiler you use to build your projects.
+
+### Test `ghcide`
+
+Next, check that `ghcide` is capable of loading your code. Change to the project directory and run `ghcide`, which will try and load everything using the same code as the IDE, but in a way that&apos;s much easier to understand. For example, taking the example of [`shake`](https://github.com/ndmitchell/shake), running `ghcide` gives some error messages and warnings before reporting at the end:
+
+```console
+Files that failed:
+ * .\model\Main.hs
+ * .\model\Model.hs
+ * .\model\Test.hs
+ * .\model\Util.hs
+ * .\output\docs\Main.hs
+ * .\output\docs\Part_Architecture_md.hs
+Completed (152 worked, 6 failed)
+```
+
+Of the 158 files in Shake, as of this moment, 152 can be loaded by the IDE, but 6 can&apos;t (error messages for the reasons they can&apos;t be loaded are given earlier). The failing files are all prototype work or test output, meaning I can confidently use Shake.
+
+The `ghcide` executable mostly relies on [`hie-bios`](https://github.com/haskell/hie-bios) to do the difficult work of setting up your GHC environment. If it doesn&apos;t work, see [the `hie-bios` manual](https://github.com/haskell/hie-bios#readme) to get it working. My default fallback is to figure it out by hand and create a `direct` style [`hie.yaml`](https://github.com/ndmitchell/shake/blob/master/hie.yaml) listing the command line arguments to load the project.
+
+If you can&apos;t get `ghcide` working outside the editor, see [this setup troubleshooting guide](https://github.com/haskell/haskell-language-server/tree/master/ghcide/docs/Setup.md). Once you have got `ghcide` working outside the editor, the next step is to pick which editor to integrate with.
+
+### Optimal project setup
+
+`ghcide` has been designed to handle projects with hundreds or thousands of modules. If `ghci` can handle it, then `ghcide` should be able to handle it. The only caveat is that this currently requires GHC &gt;= 8.8, and that the first time a module is loaded in the editor will trigger generation of support files in the background if those do not already exist.
+
+### Using with VS Code
+
+The [Haskell](https://marketplace.visualstudio.com/items?itemName=haskell.haskell) extension has a setting for ghcide.
+
+### Using with Sublime Text
+
+* Install [LSP](https://packagecontrol.io/packages/LSP)
+* Press Ctrl+Shift+P or Cmd+Shift+P in Sublime Text and search for *Preferences: LSP Settings*, then paste these settings
+```
+{
+  &quot;clients&quot;:
+  {
+    &quot;ghcide&quot;:
+    {
+      &quot;enabled&quot;   : true,
+      &quot;languageId&quot;: &quot;haskell&quot;,
+      &quot;command&quot;   : [&quot;ghcide&quot;, &quot;--lsp&quot;],
+      &quot;scopes&quot;    : [&quot;source.haskell&quot;],
+      &quot;syntaxes&quot;  : [&quot;Packages/Haskell/Haskell.sublime-syntax&quot;]
+    }
+  }
+}
+```
+
+### Using with Emacs
+
+If you don&apos;t already have [MELPA](https://melpa.org/#/) package installation configured, visit MELPA [getting started](https://melpa.org/#/getting-started) page to get set up. Then, install [`use-package`](https://melpa.org/#/use-package).
+
+Now you have a choice of two different Emacs packages which can be used to communicate with the `ghcide` LSP server:
+
++ `lsp-ui`
++ `eglot` (requires Emacs 26.1+)
+
+In each case, you can enable support by adding the shown lines to your `.emacs`:
+
+#### lsp-ui
+
+```elisp
+;; LSP
+(use-package flycheck
+  :ensure t
+  :init
+  (global-flycheck-mode t))
+(use-package yasnippet
+  :ensure t)
+(use-package lsp-mode
+  :ensure t
+  :hook (haskell-mode . lsp)
+  :commands lsp)
+(use-package lsp-ui
+  :ensure t
+  :commands lsp-ui-mode)
+(use-package lsp-haskell
+ :ensure t
+ :config
+ (setq lsp-haskell-process-path-hie &quot;ghcide&quot;)
+ (setq lsp-haskell-process-args-hie &apos;())
+ ;; Comment/uncomment this line to see interactions between lsp client/server.
+ ;;(setq lsp-log-io t)
+)
+```
+
+#### eglot
+
+````elisp
+(use-package eglot
+  :ensure t
+  :config
+  (add-to-list &apos;eglot-server-programs &apos;(haskell-mode . (&quot;ghcide&quot; &quot;--lsp&quot;))))
+````
+
+### Using with Vim/Neovim
+
+#### `LanguageClient-neovim`
+Install [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim)
+
+Add this to your vim config:
+```vim
+let g:LanguageClient_rootMarkers = [&apos;*.cabal&apos;, &apos;stack.yaml&apos;]
+let g:LanguageClient_serverCommands = {
+    \ &apos;rust&apos;: [&apos;rls&apos;],
+    \ &apos;haskell&apos;: [&apos;ghcide&apos;, &apos;--lsp&apos;],
+    \ }
+```
+
+Refer to `:he LanguageClient` for more details on usage and configuration.
+
+#### `vim-lsp`
+Install [vim-lsp](https://github.com/prabirshrestha/vim-lsp).
+
+Add this to your vim config:
+
+```vim
+au User lsp_setup call lsp#register_server({
+    \ &apos;name&apos;: &apos;ghcide&apos;,
+    \ &apos;cmd&apos;: {server_info-&gt;[&apos;/your/path/to/ghcide&apos;, &apos;--lsp&apos;]},
+    \ &apos;whitelist&apos;: [&apos;haskell&apos;],
+    \ })
+```
+
+To verify it works move your cursor over a symbol and run `:LspHover`.
+
+### `coc.nvim`
+
+Install [coc.nvim](https://github.com/neoclide/coc.nvim)
+
+Add this to your coc-settings.json (which you can edit with :CocConfig):
+
+```json
+{
+  &quot;languageserver&quot;: {
+    &quot;haskell&quot;: {
+      &quot;command&quot;: &quot;ghcide&quot;,
+      &quot;args&quot;: [
+        &quot;--lsp&quot;
+      ],
+      &quot;rootPatterns&quot;: [
+        &quot;.stack.yaml&quot;,
+        &quot;.hie-bios&quot;,
+        &quot;BUILD.bazel&quot;,
+        &quot;cabal.config&quot;,
+        &quot;package.yaml&quot;
+      ],
+      &quot;filetypes&quot;: [
+        &quot;hs&quot;,
+        &quot;lhs&quot;,
+        &quot;haskell&quot;
+      ]
+    }
+  }
+}
+```
+
+Here&apos;s a nice article on setting up neovim and coc: [Vim and Haskell in
+2019](http://marco-lopes.com/articles/Vim-and-Haskell-in-2019/) (this is actually for haskell-ide, not ghcide)
+
+Here is a Docker container that pins down the build and configuration for
+Neovim and ghcide on a minimal Debian 10 base system:
+[docker-ghcide-neovim](https://github.com/carlohamalainen/docker-ghcide-neovim/).
+
+### SpaceVim
+
+In the `autocomplete` layer, add the `autocomplete_method` option to force the use of `coc`:
+
+```toml
+[[layers]]
+  name = &apos;autocomplete&apos;
+  auto-completion-return-key-behavior = &quot;complete&quot;
+  auto-completion-tab-key-behavior = &quot;smart&quot;
+  [options]
+    autocomplete_method = &quot;coc&quot;
+```
+
+Add this to your coc-settings.json (which you can edit with :CocConfig):
+
+```json
+{
+  &quot;languageserver&quot;: {
+    &quot;haskell&quot;: {
+      &quot;command&quot;: &quot;ghcide&quot;,
+      &quot;args&quot;: [
+        &quot;--lsp&quot;
+      ],
+      &quot;rootPatterns&quot;: [
+        &quot;.stack.yaml&quot;,
+        &quot;.hie-bios&quot;,
+        &quot;BUILD.bazel&quot;,
+        &quot;cabal.config&quot;,
+        &quot;package.yaml&quot;
+      ],
+      &quot;filetypes&quot;: [
+        &quot;hs&quot;,
+        &quot;lhs&quot;,
+        &quot;haskell&quot;
+      ]
+    }
+  }
+}
+```
+
+This example above describes a setup in which `ghcide` is installed
+using `stack install ghcide` within a project.
+
+### Using with Kakoune
+
+Install [kak-lsp](https://github.com/ul/kak-lsp).
+
+Change `kak-lsp.toml` to include this:
+
+```toml
+[language.haskell]
+filetypes = [&quot;haskell&quot;]
+roots = [&quot;Setup.hs&quot;, &quot;stack.yaml&quot;, &quot;*.cabal&quot;, &quot;cabal.project&quot;, &quot;hie.yaml&quot;]
+command = &quot;ghcide&quot;
+args = [&quot;--lsp&quot;]
+```
+
+## Hacking on ghcide
+
+To build and work on `ghcide` itself, you should use cabal, e.g.,
+running `cabal test` will execute the test suite. You can use `stack test` too, but
+note that some tests will fail, and none of the maintainers are currently using `stack`.
+
+If you are using Nix, there is a Cachix nix-shell cache for all the supported platforms: `cachix use haskell-ghcide`.
+
+If you are using Windows, you should disable the `auto.crlf` setting and configure your editor to use LF line endings, directly or making it use the existing `.editor-config`.
+
+If you are chasing down test failures, you can use the tasty-rerun feature by running tests as
+
+    cabal test --test-options&quot;--rerun&quot;
+
+This writes a log file called `.tasty-rerun-log` of the failures, and only runs those.
+See the [tasty-rerun](https://hackage.haskell.org/package/tasty-rerun-1.1.17/docs/Test-Tasty-Ingredients-Rerun.html) documentation for other options.
+
+If you are touching performance sensitive code, take the time to run a differential
+benchmark between HEAD and master using the benchHist script. This assumes that
+&quot;master&quot; points to the upstream master.
+
+Run the benchmarks with `cabal bench`.
+
+It should take around 15 minutes and the results will be stored in the `bench-results` folder. To interpret the results, see the comments in the `bench/hist/Main.hs` module.
+
+More details in [bench/README](https://github.com/haskell/haskell-language-server/tree/master/ghcide/bench/README.md)
+
+
+## History and relationship to other Haskell IDE&apos;s
+
+The teams behind this project and the [`haskell-ide-engine`](https://github.com/haskell/haskell-ide-engine#readme) have agreed to join forces under the [`haskell-language-server` project](https://github.com/haskell/haskell-language-server), see the [original announcement](https://neilmitchell.blogspot.com/2020/01/one-haskell-ide-to-rule-them-all.html). The technical work is ongoing, with the likely model being that this project serves as the core, while plugins and integrations are kept in the [`haskell-language-server` project](https://github.com/haskell/haskell-language-server).
+
+The code behind `ghcide` was originally developed by [Digital Asset](https://digitalasset.com/) as part of the [DAML programming language](https://github.com/digital-asset/daml). DAML is a smart contract language targeting distributed-ledger runtimes, based on [GHC](https://www.haskell.org/ghc/) with custom language extensions. The DAML programming language has [an IDE](https://webide.daml.com/), and work was done to separate off a reusable Haskell-only IDE (what is now `ghcide`) which the [DAML IDE then builds upon](https://github.com/digital-asset/daml/tree/master/compiler/damlc). Since that time, there have been various [non-Digital Asset contributors](https://github.com/haskell/ghcide/graphs/contributors), in addition to continued investment by Digital Asset. The project has been handed over to Haskell.org as of September 2020.
+
+The Haskell community [has](https://github.com/DanielG/ghc-mod) [various](https://github.com/chrisdone/intero) [IDE](https://github.com/rikvdkleij/intellij-haskell) [choices](http://leksah.org/), but the one that had been gathering momentum is [`haskell-ide-engine`](https://github.com/haskell/haskell-ide-engine#readme). Our project owes a debt of gratitude to the `haskell-ide-engine`. We reuse libraries from their ecosystem, including [`hie-bios`](https://github.com/mpickering/hie-bios#readme) (a likely future environment setup layer in `haskell-ide-engine`), [`haskell-lsp`](https://github.com/alanz/haskell-lsp#readme) and [`lsp-test`](https://github.com/bubba/lsp-test#readme) (the `haskell-ide-engine` [LSP protocol](https://microsoft.github.io/language-server-protocol/) pieces). We make heavy use of their contributions to GHC itself, in particular the work to make GHC take string buffers rather than files.
+
+The best summary of the architecture of `ghcide` is available [this talk](https://www.youtube.com/watch?v=cijsaeWNf2E&amp;list=PLxxF72uPfQVRdAsvj7THoys-nVj-oc4Ss) ([slides](https://ndmitchell.com/downloads/slides-making_a_haskell_ide-07_sep_2019.pdf)), given at [MuniHac 2019](https://munihac.de/2019.html). However, since that talk the project has renamed from `hie-core` to `ghcide`, and the repo has moved to [this location](https://github.com/haskell/ghcide/).</file><file path="docs/components/index.rst">Components
+===========
+
+.. toctree::
+   :maxdepth: 2
+
+   ghcide</file><file path="docs/contributing/contributing.md"># Contributing guidelines
+
+The Haskell tooling dream is near, we need your help!
+
+## How to contact the Haskell Language Server (HLS) team
+
+- Join the [haskell-language-server channel](https://matrix.to/#/#haskell-language-server:matrix.org) on [matrix](https://matrix.org/) (primary communication channel).
+- Join [our IRC channel](https://web.libera.chat/?channels=#haskell-language-server) at `#haskell-language-server` on [`libera`](https://libera.chat/) (secondary communication channel - all messages in this IRC channel are automatically bridged to the Matrix channel).
+- Visit [the project GitHub repo](https://github.com/haskell/haskell-language-server) to view the source code, or open issues or pull requests.
+
+## Building
+
+Clone the repository:
+```shell
+$ git clone https://github.com/haskell/haskell-language-server
+```
+
+The project can then be built with both `cabal build` and `stack build`.
+
+### Building with Cabal
+
+```shell
+# If you have not run `cabal update` in a while
+$ cabal update
+# Then
+$ cabal build
+```
+
+### Building with Stack
+
+```shell
+$ stack build
+```
+
+### Building with Nix
+
+The instructions below show how to set up a Cachix binary cache and open a Nix shell for local development.
+
+```shell
+$ cachix use haskell-language-server
+$ nix-shell
+$ cabal update
+$ cabal build
+```
+
+#### Flakes support
+
+If you are using Nix 2.4 style commands (enabled by `experimental-features = nix-command`),
+you can use `nix develop` instead of `nix-shell` to enter the development shell. To enter the shell with specific GHC versions:
+
+* `nix develop` - default GHC version,
+* `nix develop .#shell-ghc90` - GHC 9.0.1 (substitute GHC version as appropriate).
+
+If you are looking for a Nix expression to create `haskell-language-server` binaries, see https://github.com/haskell/haskell-language-server/issues/122
+
+## Testing
+
+The tests make use of the [Tasty](https://github.com/feuerbach/tasty) test framework.
+
+There are two test suites in the main `haskell-language-server` package, functional tests, and wrapper tests.
+Some of the wrapper tests expect `stack` to be present on the system, or else they fail.
+Other project packages, like the core library or plugins, can have their own test suite.
+
+### Testing with Cabal
+
+Running all the tests
+
+```bash
+$ cabal test
+```
+
+Running just the functional tests
+
+```bash
+$ cabal test func-test
+```
+
+Running just the wrapper tests
+
+```bash
+$ cabal test wrapper-test
+```
+
+Running just the tests for a specific plugin
+
+```bash
+$ cabal test hls-&lt;plugin-name&gt;-plugin-tests
+# E.g.
+$ cabal test hls-refactor-plugin-tests
+```
+
+Running a subset of tests
+
+Tasty supports providing
+[patterns](https://github.com/feuerbach/tasty#patterns) as command
+line arguments, to select the specific tests to run.
+
+```bash
+$ cabal test func-test --test-option &quot;-p hlint&quot;
+```
+
+The above recompiles everything every time you use a different test option though.
+An alternative, which only recompiles when tests (or dependencies) change is to pass the `TASTY_PATTERN` environment variable:
+
+```bash
+$ TASTY_PATTERN=&apos;hlint&apos; cabal test func-test
+```
+
+## Using HLS on HLS code
+
+Refer to the [HLS project configuration guidelines](../configuration.md#configuring-your-project-build) as they also apply to the HLS project itself.
+
+Note: HLS implicitly detects the HLS codebase as a Stack project (since there is a `stack.yaml` file).
+If you want HLS to use Cabal, create this `hie.yaml` file at the root of the project:
+
+```yaml
+cradle:
+  cabal:
+```
+
+## Manually testing your hacked HLS
+If you want to test HLS while hacking on it (you can even test it on HLS codebase itself, see previous section), you need to:
+
+1. (Once) Find the path to the hacked HLS you build
+2. (Once) Configure your editor to use it
+3. (Every time you change the HLS code) Rebuild HLS
+4. (Every time you change the HLS code) Restart the LSP workspace
+
+### Find the path to your HLS build
+Note that unless you change the GHC version or the HLS version between builds, the path should remain the same, this is why you need to set it only once.
+
+#### Using Cabal
+Run:
+```shell
+$ cabal build exe:haskell-language-server &amp;&amp; cabal list-bin exe:haskell-language-server
+[..]
+&lt;some long path&gt;/haskell-language-server
+```
+
+#### Using Stack
+Run:
+```shell
+$ echo $(pwd)/$(stack path --dist-dir)/build/haskell-language-server/haskell-language-server
+[..]
+&lt;some long path&gt;/haskell-language-server
+```
+
+### Configuring your editor to use your HLS build
+
+#### Configuring VS Code
+When using VS Code you can set up each project to use a specific HLS executable:
+
+- If it doesn&apos;t already exist in your project directory, create a directory called `.vscode`.
+- In the `.vscode` directory create a file called `settings.json` with the below contents.
+```json
+{
+    &quot;haskell.serverExecutablePath&quot;: &quot;/path/to/your/hacked/haskell-language-server&quot;
+}
+```
+
+#### Configuring Emacs
+There are several ways to configure the HLS server path, each of which depends on your choice of language server provider (e.g., emacs-lsp or eglot). If using emacs-lsp, you need to configure the variable `lsp-haskell-server-path`:
+- `M-x customize-group&lt;RET&gt;lsp-haskell&lt;RET&gt;Lsp Haskell Server Path`
+- Evaluate `(setq lsp-haskell-server-path &quot;/path/to/your/hacked/haskell-language-server&quot;)`
+- Create a file `.dir-locals.el` with the following content:
+```lisp
+((haskell-mode . ((lsp-haskell-server-path . &quot;/path/to/your/hacked/haskell-language-server&quot;))))
+```
+
+If using eglot, you need to configure the variable `eglot-server-programs`, which is an alist associating major-modes to executables:
+- Evaluate `(setf (alist-get &apos;haskell-mode eglot-server-programs) (&quot;/path/to/your/hacked/haskell-language-server&quot; &quot;--lsp&quot;))`
+- Create a file `.dir-locals.el` with the following content:
+```lisp
+((haskell-mode . ((eglot-server-programs . ((&apos;haskell-mode . (&quot;/path/to/your/hacked/haskell-language-server&quot; &quot;--lsp&quot;)))))))
+```
+
+### Rebuild HLS
+- With Stack: `stack build haskell-language-server:exe:haskell-language-server`
+- With Cabal: `cabal build exe:haskell-language-server`
+
+### Restart the LSP workspace
+
+- With VS Code: Press `Ctrl + Shift + p` and type `Haskell: Restart Haskell LSP Server`
+- With Emacs: `M-x lsp-workspace-restart`
+
+## Style guidelines
+
+The project includes a [`.editorconfig`](https://editorconfig.org) [file](https://github.com/haskell/haskell-language-server/blob/master/.editorconfig) with the editor basic settings used by the project.
+However, most editors will need some action to honour those settings automatically.
+For example VS Code needs to have installed a specific [extension](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig).
+Please, try to follow those basic settings to keep the codebase as uniform as possible.
+
+### Formatter pre-commit hook
+
+We are using [pre-commit](https://pre-commit.com/) to configure the git pre-commit hook for formatting. Although it is possible to format code manually, we recommend you to use the pre-commit hook as our CI checks if the hook was applied or not.
+
+If you are using Nix or Gitpod, the pre-commit hook is automatically installed. Otherwise, follow the instructions on
+[https://pre-commit.com/](https://pre-commit.com/) to install the `pre-commit` tool. Then run the following command:
+
+```sh
+pre-commit install
+```
+
+#### Why are some components excluded from automatic formatting?
+
+- `test/testdata` and `test/data` are excluded because we want to test formatting plugins.
+
+## Plugin tutorial
+
+See the [tutorial on writing a plugin in HLS](./plugin-tutorial.md).
+
+## Measuring, benchmarking and tracing
+
+### Benchmarks
+
+If you are touching performance sensitive code, take the time to run a differential benchmark between `HEAD` and `origin/master` (see [bench/README](https://github.com/haskell/haskell-language-server/blob/master/bench/README.md)).
+
+Run the benchmarks with `cabal bench`. The runtime is about 25 minutes and the results will be stored in the `bench-results` folder. To interpret the results, see the comments in the [bench/Main.hs](https://github.com/haskell/haskell-language-server/blob/master/bench/Main.hs) module.
+
+### Tracing
+
+HLS records [eventlog traces](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/runtime_control.html#rts-eventlog) via [opentelemetry](https://hackage.haskell.org/package/opentelemetry). To generate the traces, build with `-eventlog` and run with `+RTS -l`. To visualize the traces, install [Tracy](https://github.com/wolfpld/tracy) and use [eventlog-to-tracy](https://hackage.haskell.org/package/opentelemetry-extra) to open the generated eventlog.
+
+## Adding support for a new editor
+
+Adding support for new editors is fairly easy if the editor already has good support for generic LSP-based extensions.
+In that case, there will likely be an editor-specific support system (e.g., `lsp-mode` for Emacs).
+The support system will typically provide instructions for how to add support for new languages.
+
+In some cases you may need to write a small bit of additional client support, or expose a way for the user to set the server&apos;s [configuration options](../configuration.md#configuring-haskell-language-server) and for them to configure how the server is started.
+
+## Building the documentation
+
+The documentation is built with [Sphinx](https://www.sphinx-doc.org/en/master/) and [ReadTheDocs](https://docs.readthedocs.io/en/stable/index.html), the documentation of both is helpful.
+
+You need to install some Python prerequisites. You can either `pip install -r docs/requirements.txt`, or simply enter a `nix-shell`.
+
+Then to build and preview the documentation:
+
+```
+cd docs
+make html
+firefox _build/html/index.html
+```
+
+Alternatively, you can build the documentation as a Nix derivation from the Flake with `nix build .#docs`.
+
+The documentation is also built and previewed on every PR, so you can check them from the PR status.
+
+## Working on code actions
+
+To make HLS easier to maintain, please follow these design guidelines when adding or modifying code actions:
+
+1. Prefer `ghc-exactprint` to manual text parsing.
+2. Prefer `ghc-exactprint` to manual code generation.
+3. Code generating actions should not try to format the generated code. Assume that the user is also leveraging HLS for automated code formatting.
+4. Put new code actions in their own plugin unless they are very closely aligned with an existing code action.
+
+## Sponsorship
+
+If you want to contribute financially, you can do so via [open-collective](https://opencollective.com/haskell-language-server). In the past, the funding was used to sponsor [summer student projects](https://mpickering.github.io/ide/posts/2021-07-22-summer-of-hls.html).</file><file path="docs/contributing/index.rst">Contributing
+============
+
+.. toctree::
+   :maxdepth: 2
+
+   contributing
+   plugin-tutorial</file><file path="docs/contributing/plugin-tutorial.md"># Let’s write a Haskell Language Server plugin
+
+Originally written by Pepe Iborra, maintained by the Haskell community.
+
+Haskell Language Server (HLS) is a Language Server Protocol (LSP) server for the Haskell programming language. It builds on several previous efforts to create a Haskell IDE.
+You can find many more details on the history and architecture on the [IDE 2020](https://mpickering.github.io/ide/index.html) community page.
+In this article we are going to cover the creation of an HLS plugin from scratch: a code lens to display explicit import lists.
+Along the way we will learn about HLS, its plugin model, and the relationship with [ghcide](https://github.com/haskell/haskell-language-server/tree/master/ghcide) and LSP.
+
+## Introduction
+
+Writing plugins for HLS is a joy. Personally, I enjoy the ability to tap into the gigantic bag of goodies that is GHC, as well as the IDE integration thanks to LSP.
+
+In the last couple of months, I have written various HLS plugins, including:
+
+1. Suggest imports for variables not in scope,
+2. Remove redundant imports,
+3. Evaluate code in comments (à la [doctest](https://docs.python.org/3/library/doctest.html)),
+4. Integrate the [retrie](https://github.com/facebookincubator/retrie) refactoring library.
+
+These plugins are small but meaningful steps towards a more polished IDE experience.
+While writing them, I didn&apos;t have to worry about performance, UI, or distribution; another tool (usually GHC) always did the heavy lifting.
+
+The plugins also make these tools much more accessible to all users of HLS.
+
+## Preamble
+
+This tutorial is a literate Haskell file that can be compiled.
+As such, we list the imports, extensions etc... necessary for compilation.
+
+Please just skip over this `import` section, if you are only interested in the tutorial!
+
+```haskell
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+
+import Ide.Types
+import Ide.Logger
+import Ide.Plugin.Error
+
+import Development.IDE.Core.RuleTypes
+import Development.IDE.Core.Service hiding (Log)
+import Development.IDE.Core.Shake hiding (Log)
+import Development.IDE.GHC.Compat
+import Development.IDE.GHC.Compat.Core
+import Development.IDE.GHC.Error
+import Development.IDE.Types.HscEnvEq
+import Development.IDE.Core.PluginUtils
+
+import qualified Language.LSP.Server as LSP
+import Language.LSP.Protocol.Types as JL
+import Language.LSP.Protocol.Message
+
+import Data.Aeson as Aeson
+import Data.Map (Map)
+import Data.IORef
+import Data.Maybe (fromMaybe, catMaybes)
+import qualified Data.Map as Map
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Text as T
+import Control.Monad (forM)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class
+import GHC.Generics (Generic)
+```
+
+## Plugins in the HLS codebase
+
+The HLS codebase includes several plugins (found in `./plugins`). For example:
+
+- The `ormolu`, `fourmolu`, `floskell` and `stylish-haskell` plugins used to format code
+- The `eval` plugin, a code lens provider to evaluate code in comments
+- The `retrie` plugin, a code action provider to execute retrie commands
+
+I recommend looking at the existing plugins for inspiration and reference. A few conventions shared by all plugins are:
+
+- Plugins are in the `./plugins` folder
+- Plugins implement their code under the `Ide.Plugin.*` namespace
+- Folders containing the plugin follow the `hls-pluginname-plugin` naming convention
+- Plugins are &quot;linked&quot; in `src/HlsPlugins.hs#idePlugins`. New plugin descriptors
+  must be added there.
+
+  ```haskell ignore
+  -- Defined in src/HlsPlugins.**hs**
+
+  idePlugins = pluginDescToIdePlugins allPlugins
+    where
+      allPlugins =
+        [ GhcIde.descriptor &quot;ghcide&quot;
+        , Pragmas.descriptor &quot;pragmas&quot;
+        , Floskell.descriptor &quot;floskell&quot;
+        , Fourmolu.descriptor &quot;fourmolu&quot;
+        , Ormolu.descriptor &quot;ormolu&quot;
+        , StylishHaskell.descriptor &quot;stylish-haskell&quot;
+        , Retrie.descriptor &quot;retrie&quot;
+        , Eval.descriptor &quot;eval&quot;
+        , NewPlugin.descriptor &quot;new-plugin&quot; -- Add new plugins here.
+        ]
+  ```
+
+To add a new plugin, extend the list of `allPlugins` and rebuild.
+
+## The goal of the plugin we will write
+
+Here is a visual statement of what we want to accomplish:
+
+   ![Imports code lens](imports.gif)
+
+And here is the gist of the algorithm:
+
+1. Request the type checking artifacts from the `ghcide` subsystem
+2. Extract the actual import lists from the type-checked AST
+3. Ask GHC to produce the minimal import lists for this AST
+4. For every import statement without an explicit import list:
+   - Determine the minimal import list
+   - Produce a code lens to display it and a command to apply it
+
+## Setup
+
+To get started, fetch the HLS repository and build it by following the [installation instructions](https://haskell-language-server.readthedocs.io/en/latest/contributing/contributing.html#building).
+
+If you run into any issues trying to build the binaries, you can get in touch with the HLS team using one of the [contact channels](https://haskell-language-server.readthedocs.io/en/latest/contributing/contributing.html#how-to-contact-the-haskell-ide-team) or [open an issue](https://github.com/haskell/haskell-language-server/issues) in the HLS repository.
+
+Once the build is done, you can find the location of the HLS binary with `cabal list-bin exe:haskell-language-server` and point your LSP client to it.
+This way you can simply test your changes by reloading your editor after rebuilding the binary.
+
+&gt; **Note:** In VSCode, edit the &quot;Haskell Server Executable Path&quot; setting.
+&gt;
+&gt; **Note:** In Emacs, edit the `lsp-haskell-server-path` variable.
+
+![Settings](settings-vscode.png)
+
+[Manually test your hacked HLS](https://haskell-language-server.readthedocs.io/en/latest/contributing/contributing.html#manually-testing-your-hacked-hls) to ensure you use the HLS package you just built.
+
+## Digression about the Language Server Protocol
+
+There are two main types of communication in the Language Server Protocol:
+
+- A **request-response interaction** type where one party sends a message that requires a response from the other party.
+- A **notification** is a one-way interaction where one party sends a message without expecting any response.
+
+&gt; **Note**: The LSP client and server can both send requests or notifications to the other party.
+
+## Anatomy of a plugin
+
+HLS plugins are values of the `PluginDescriptor` datatype, which is defined in `hls-plugin-api/src/Ide/Types.hs` as:
+
+```haskell ignore
+data PluginDescriptor (ideState :: Type) =
+  PluginDescriptor { pluginId                   :: !PluginId
+                   , pluginCommands             :: ![PluginCommand ideState]
+                   , pluginHandlers             :: PluginHandlers ideState
+                   , pluginNotificationHandlers :: PluginNotificationHandlers ideState
+--                 , [...] -- Other fields omitted for brevity.
+                   }
+```
+
+### Request-response interaction
+
+The `pluginHandlers` handle LSP client requests and provide responses to the client. They must fulfill these requests as quickly as possible.
+
+- Example: When you want to format a file, the client sends the [`textDocument/formatting`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting) request to the server. The server formats the file and responds with the formatted content.
+
+### Notification
+
+The `pluginNotificationHandlers` handle notifications sent by the client to the server that are not explicitly triggered by a user.
+
+- Example: Whenever you modify a Haskell file, the client sends a notification informing HLS about the changes to the file.
+
+The `pluginCommands` are special types of user-initiated notifications sent to
+the server. These actions can be long-running and involve multiple modules.
+
+## The explicit imports plugin
+
+To achieve our plugin goals, we need to define:
+
+- a command handler (`importLensCommand`),
+- a code lens request handler (`lensProvider`).
+
+These will be assembled in the `descriptor` function of the plugin, which contains all the information wrapped in the `PluginDescriptor` datatype mentioned above.
+
+Using the convenience `defaultPluginDescriptor` function, we can bootstrap the plugin with the required parts:
+
+```haskell
+-- plugins/hls-explicit-imports-plugin/src/Ide/Plugin/ExplicitImports.hs
+
+data Log
+
+-- | The &quot;main&quot; function of a plugin.
+descriptor :: Recorder (WithPriority Log) -&gt; PluginId -&gt; PluginDescriptor IdeState
+descriptor recorder plId =
+  (defaultPluginDescriptor plId &quot;A plugin for generating the minimal imports&quot;)
+    { pluginCommands = [importLensCommand], -- The plugin provides a command handler
+      pluginHandlers = mconcat -- The plugin provides request handlers
+        [  mkPluginHandler SMethod_TextDocumentCodeLens provider
+        ]
+    }
+```
+
+We&apos;ll start with the command, since it&apos;s the simplest of the two.
+
+### The command handler
+
+In short, LSP commands work like this:
+
+- The LSP server (HLS) initially sends a command descriptor to the client, in this case as part of a code lens.
+- When the user clicks on the code lens, the client asks HLS to execute the command with the given descriptor. The server then handles and executes the command; this latter part is implemented by the `commandFunc` field of our `PluginCommand` value.
+
+&gt; **Note**: Check the [LSP spec](https://microsoft.github.io/language-server-protocol/specification) for a deeper understanding of how commands work.
+
+The command handler will be called `importLensCommand` and have the `PluginCommand` type, a type defined in `Ide.Types` as:
+
+```haskell ignore
+-- hls-plugin-api/src/Ide/Types.hs
+
+data PluginCommand ideState = forall a. (FromJSON a) =&gt;
+  PluginCommand { commandId   :: CommandId
+                , commandDesc :: T.Text
+                , commandFunc :: CommandFunction ideState a
+                }
+```
+
+Let&apos;s start by creating an unfinished command handler. We&apos;ll give it an ID and a description for now:
+
+```haskell
+-- | The command handler.
+importLensCommand :: PluginCommand IdeState
+importLensCommand =
+  PluginCommand
+    { commandId = importCommandId
+    , commandDesc = &quot;Explicit import command&quot;
+    , commandFunc = runImportCommand
+    }
+
+importCommandId :: CommandId
+importCommandId = &quot;ImportLensCommand&quot;
+```
+
+```haskell ignore
+-- | Not implemented yet.
+runImportCommand = undefined
+```
+
+The most important (and still `undefined`) field is `commandFunc :: CommandFunction`, a type synonym from `LSP.Types`:
+
+```haskell ignore
+-- hls-plugin-api/src/Ide/Types.hs
+
+type CommandFunction ideState a
+  = ideState
+  -&gt; a
+  -&gt; LspM Config (Either ResponseError Value)
+```
+
+`CommandFunction` takes an `ideState` and a JSON-encodable argument. `LspM` is a monad transformer with access to IO, and having access to a language context environment `Config`. The action evaluates to an `Either` value. `Left` indicates failure with a `ResponseError`, `Right` indicates sucess with a `Value`.
+
+Our handler will ignore the state argument and only use the `WorkspaceEdit` argument.
+
+```haskell
+-- | The type of the parameters accepted by our command
+newtype ImportCommandParams = ImportCommandParams WorkspaceEdit
+  deriving (Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
+-- | The actual command handler
+runImportCommand :: CommandFunction IdeState ImportCommandParams
+runImportCommand _ _ (ImportCommandParams edit) = do
+  -- This command simply triggers a workspace edit!
+  _ &lt;- lift $ pluginSendRequest SMethod_WorkspaceApplyEdit (ApplyWorkspaceEditParams Nothing edit) (\_ -&gt; pure ())
+  return $ InR JL.Null
+```
+
+`runImportCommand` [sends a request](https://hackage.haskell.org/package/lsp/docs/Language-LSP-Server.html#v:sendRequest) to the client using the method `SWorkspaceApplyEdit` and the parameters `ApplyWorkspaceEditParams Nothing edit`, providing a response handler that does nothing. It then returns `Right Null`, which is an empty `Aeson.Value` wrapped in `Right`.
+
+### The code lens provider
+
+The code lens provider implements all the steps of the algorithm described earlier:
+
+&gt; 1. Request the type checking artifacts.
+&gt; 2. Extract the actual import lists from the type-checked AST.
+&gt; 3. Ask GHC to produce the minimal import lists for this AST.
+&gt; 4. For each import statement lacking an explicit list, determine its minimal import list and generate a code lens displaying this list along with a command to insert it.
+
+The provider takes the usual `LspFuncs` and `IdeState` arguments, as well as a `CodeLensParams` value containing a file URI. It returns an IO action that produces either an error or a list of code lenses for that file.
+
+```haskell
+provider :: PluginMethodHandler IdeState Method_TextDocumentCodeLens
+provider state              -- ghcide state, used to retrieve typechecking artifacts
+         pId                -- Plugin ID
+         CodeLensParams{_textDocument = TextDocumentIdentifier{_uri}} = do
+  -- VSCode uses URIs instead of file paths
+  -- haskell-lsp provides conversion functions
+  nfp &lt;- getNormalizedFilePathE _uri
+  -- Get the typechecking artifacts from the module
+  tmr &lt;- runActionE &quot;importLens&quot; state $ useE TypeCheck nfp
+  -- We also need a GHC session with all the dependencies
+  hsc &lt;- runActionE &quot;importLens&quot; state $ useE GhcSessionDeps nfp
+  -- Use the GHC API to extract the &quot;minimal&quot; imports
+  (imports, mbMinImports) &lt;- liftIO $ extractMinimalImports hsc tmr
+
+  case mbMinImports of
+      Just minImports -&gt; do
+          let minImportsMap =
+                Map.fromList [ (realSrcLocToPosition loc, i)
+                             | L l i &lt;- minImports
+                             , let RealSrcLoc loc _ = srcSpanStart (locA l)
+                             ]
+          lenses &lt;- forM imports $ \imp -&gt;
+            -- for every import, maybe generate a code lens
+            liftIO (generateLens pId _uri minImportsMap imp)
+          return $ InL (catMaybes lenses)
+      _ -&gt;
+          return $ InL []
+```
+
+Note the simplicity of retrieving the type checking artifacts for the module, as well as a fully set up GHC session, via the `ghcide` rules.
+
+The function `extractMinimalImports` extracts the import statements from the AST and generates the minimal import lists, implementing steps 2 and 3 of the algorithm.
+
+The details of the GHC API are not relevant to this tutorial, but the code is terse and easy to read:
+
+```haskell
+extractMinimalImports
+  :: HscEnvEq
+  -&gt; TcModuleResult
+  -&gt; IO ([LImportDecl GhcRn], Maybe [LImportDecl GhcRn])
+extractMinimalImports hsc TcModuleResult{..} = do
+    -- Extract the original imports and the typechecking environment
+    let tcEnv = tmrTypechecked
+        (_, imports, _, _) = tmrRenamed
+        ParsedModule{ pm_parsed_source = L loc _} = tmrParsed
+        span = fromMaybe (error &quot;expected real&quot;) $ realSpan loc
+
+    -- GHC is secretly full of mutable state
+    gblElts &lt;- readIORef (tcg_used_gres tcEnv)
+
+    let usage = findImportUsage imports gblElts
+    (_, minimalImports) &lt;-
+    -- getMinimalImports computes the minimal explicit import lists
+      initTcWithGbl (hscEnv hsc) tcEnv span $ getMinimalImports usage
+    return (imports, minimalImports)
+```
+
+The function `generateLens` implements step 4 of the algorithm, producing a code lens for an import statement that lacks an import list. The code lens includes an `ImportCommandParams` value containing a workspace edit that rewrites the import statement, as our command provider expects.
+
+```haskell
+-- | Given an import declaration, generate a code lens unless it has an explicit import list
+generateLens :: PluginId
+             -&gt; Uri
+             -&gt; Map Position (ImportDecl GhcRn)
+             -&gt; LImportDecl GhcRn
+             -&gt; IO (Maybe CodeLens)
+generateLens pId uri minImports (L src imp)
+  -- Explicit import list case
+  | ImportDecl{ideclImportList = Just _} &lt;- imp
+  = return Nothing
+  -- No explicit import list
+  | RealSrcSpan l _ &lt;- locA src
+  , let position = realSrcLocToPosition $ realSrcSpanStart l
+  , Just explicit &lt;- Map.lookup position minImports
+  , L _ mn &lt;- ideclName imp
+  -- (Almost) no one wants to see an explicit import list for Prelude
+  , mn /= moduleName pRELUDE
+  = do
+        -- The title of the command is just the minimal explicit import decl
+    let title = T.pack $ printWithoutUniques explicit
+        -- The range of the code lens is the span of the original import decl
+        _range :: Range = realSrcSpanToRange l
+        -- The code lens has no extra data
+        _xdata = Nothing
+        -- An edit that replaces the whole declaration with the explicit one
+        edit = WorkspaceEdit (Just editsMap) Nothing Nothing
+        editsMap = Map.fromList [(uri, [importEdit])]
+        importEdit = TextEdit _range title
+        -- The command argument is simply the edit
+        _arguments = Just [toJSON $ ImportCommandParams edit]
+        _data_ = Nothing
+        -- Create the command
+        _command = Just $ mkLspCommand pId importCommandId title _arguments
+    -- Create and return the code lens
+    return $ Just CodeLens{..}
+  | otherwise
+  = return Nothing
+```
+
+## Wrapping up
+
+There&apos;s only one Haskell code change left to do at this point: &quot;link&quot; the plugin in the `HlsPlugins` HLS module.
+
+Integrating the plugin into HLS itself requires changes to several configuration files.
+
+A good approach is to search for the ID of an existing plugin (e.g., `hls-class-plugin`):
+
+- `./haskell-language-server.cabal`: Add a conditional block with the plugin package dependency.
+- `./.github/workflows/test.yml`: Add a block to run the plugin&apos;s test suite.
+- `./.github/workflows/hackage.yml`: Add the plugin to the component list for releasing the plugin package to Hackage.
+- `./*.nix`: Add the plugin to Nix builds.
+
+This plugin tutorial re-implements parts of the [`hls-explicit-imports-plugin`] which is part of HLS.
+The plugin code additionally contains advanced concepts, such as `Rules`.
+
+I hope this has given you a taste of how easy and joyful it is to write plugins for HLS. If you are looking for contribution ideas, here are some good ones listed in the HLS [issue tracker](https://github.com/haskell/haskell-language-server/issues).
+
+&lt;details&gt;
+  &lt;summary&gt;Placeholder Main, unused&lt;/summary&gt;
+
+```haskell
+main :: IO ()
+main = putStrLn &quot;Just here to silence the error!&quot;
+```
+&lt;/details&gt;</file><file path="docs/logos/logo.svg">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;svg xmlns:svg=&quot;http://www.w3.org/2000/svg&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;
+     width=&quot;290mm&quot; height=&quot;215mm&quot; viewBox=&quot;0 0 290 215&quot;&gt;
+  &lt;g id=&quot;h&quot;&gt;
+    &lt;path id=&quot;h_greater&quot; fill=&quot;#453a62&quot;
+          d=&quot;M 65,119.99956 105.00031,59.99978 65,0 H 94.999891 L 135.0002,59.99978 94.999891,119.99956 Z m 0,0&quot; /&gt;
+    &lt;path id=&quot;h_lambda&quot; fill=&quot;#5e5086&quot;
+          d=&quot;M 105.00031,119.99956 145.00063,59.99978 105.00031,0 h 29.99989 l 79.99925,119.99956 H 184.99956 L 160.00057,82.500387 135.0002,119.99956 Z m 0,0&quot; /&gt;
+  &lt;/g&gt;
+  &lt;path id=&quot;l&quot; fill=&quot;#8f4e8b&quot;
+        d=&quot;m 60,125 h 30 l -40,60 h 75 l -20,30 H 0 Z&quot; /&gt;
+  &lt;path id=&quot;s&quot; fill=&quot;#8f4e8b&quot;
+        d=&quot;m 185,150 h 55 l -20,-25 h -45 l -35,55 h 95 l 2,5 H 135 l -20,30 h 175 l -45,-60 h -62 z&quot; /&gt;
+&lt;/svg&gt;</file><file path="docs/support/ghc-version-support.md"># GHC version support
+
+## Current GHC version support status
+
+The current support for different GHC versions is given in the following table.
+
+Last supporting HLS version:
+- &quot;next&quot;: this GHC version is supported in master, and will be in the next released version of HLS.
+- &quot;latest&quot;: this GHC version is one of the actively supported versions (see below) and is supported in the latest released version of HLS.
+- specific version number: this GHC version is no longer one of the actively supported versions, and the last version of HLS which supports it is listed.
+
+Support status (see the support policy below for more details):
+- &quot;initial support&quot;: support for this GHC version is underway, but it is not ready to be released yet
+- &quot;basic support&quot;: this GHC version is currently actively supported, and all [tier 1 plugins](./plugin-support.md) work
+- &quot;full support&quot;: this GHC version is currently actively supported, and most [tier 2 plugins](./plugin-support.md) work
+- &quot;deprecated&quot;: this GHC version was supported in the past, but is now deprecated
+
+| GHC version  | Last supporting HLS version                                                          | Support status |
+| ------------ | ------------------------------------------------------------------------------------ | -------------- |
+| 9.12.2       | [latest](https://github.com/haskell/haskell-language-server/releases/latest)         | full support   |
+| 9.10.3       | [latest](https://github.com/haskell/haskell-language-server/releases/latest)         | full support   |
+| 9.10.2       | [latest](https://github.com/haskell/haskell-language-server/releases/latest)         | full support   |
+| 9.10.1       | [latest](https://github.com/haskell/haskell-language-server/releases/latest)         | full support   |
+| 9.8.4        | [latest](https://github.com/haskell/haskell-language-server/releases/latest)         | full support   |
+| 9.8.2        | [2.9.0.1](https://github.com/haskell/haskell-language-server/releases/tag/2.9.0.1)   | deprecated     |
+| 9.8.1        | [2.6.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.6.0.0)   | deprecated   |
+| 9.6.7        | [latest](https://github.com/haskell/haskell-language-server/releases/latest)         | full support   |
+| 9.6.6        | [2.9.0.1](https://github.com/haskell/haskell-language-server/releases/tag/2.9.0.1)   | deprecated   |
+| 9.6.5        | [2.9.0.1](https://github.com/haskell/haskell-language-server/releases/tag/2.9.0.1)   | deprecated     |
+| 9.6.4        | [2.6.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.6.0.0)   | deprecated     |
+| 9.6.3        | [2.5.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.5.0.0)   | deprecated     |
+| 9.6.2        | [2.2.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.2.0.0)   | deprecated     |
+| 9.6.1        | [2.0.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.0.0.0)   | deprecated     |
+| 9.4.8        | [latest](https://github.com/haskell/haskell-language-server/releases/latest)         | full support   |
+| 9.4.7        | [2.5.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.5.0.0)   | deprecated     |
+| 9.4.6        | [2.2.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.2.0.0)   | deprecated     |
+| 9.4.5        | [2.2.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.2.0.0)   | deprecated     |
+| 9.4.4        | [1.10.0.0](https://github.com/haskell/haskell-language-server/releases/tag/1.10.0.0) | deprecated     |
+| 9.4.3        | [1.9.1.0](https://github.com/haskell/haskell-language-server/releases/tag/1.9.1.0)   | deprecated     |
+| 9.4.(1,2)    | [1.8.0.0](https://github.com/haskell/haskell-language-server/releases/tag/1.8.0.0)   | deprecated     |
+| 9.2.8        | [2.9.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.9.0.0)   | deprecated     |
+| 9.2.7        | [2.0.0.1](https://github.com/haskell/haskell-language-server/releases/tag/2.0.0.1)   | deprecated     |
+| 9.2.(5,6)    | [1.9.1.0](https://github.com/haskell/haskell-language-server/releases/tag/1.9.1.0)   | deprecated     |
+| 9.2.(3,4)    | [1.8.0.0](https://github.com/haskell/haskell-language-server/releases/tag/1.8.0.0)   | deprecated     |
+| 9.2.(1,2)    | [1.7.0.0](https://github.com/haskell/haskell-language-server/releases/tag/1.7.0.0)   | deprecated     |
+| 9.0.2        | [2.4.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.4.0.0)   | deprecated     |
+| 9.0.1        | [1.6.1.0](https://github.com/haskell/haskell-language-server/releases/tag/1.6.1.0)   | deprecated     |
+| 8.10.7       | [2.2.0.0](https://github.com/haskell/haskell-language-server/releases/tag/2.2.0.0)   | deprecated     |
+| 8.10.6       | [1.6.1.0](https://github.com/haskell/haskell-language-server/releases/tag/1.6.1.0)   | deprecated     |
+| 8.10.5       | [1.5.1](https://github.com/haskell/haskell-language-server/releases/tag/1.5.1)       | deprecated     |
+| 8.10.(4,3,2) | [1.4.0](https://github.com/haskell/haskell-language-server/releases/tag/1.4.0)       | deprecated     |
+| 8.10.1       | [0.9.0](https://github.com/haskell/haskell-language-server/releases/tag/0.9.0)       | deprecated     |
+| 8.8.4        | [1.8.0](https://github.com/haskell/haskell-language-server/releases/1.8.0)           | deprecated     |
+| 8.8.3        | [1.5.1](https://github.com/haskell/haskell-language-server/releases/1.5.1)           | deprecated     |
+| 8.8.2        | [1.2.0](https://github.com/haskell/haskell-language-server/releases/tag/1.2.0)       | deprecated     |
+| 8.6.5        | [1.8.0.0](https://github.com/haskell/haskell-language-server/releases/tag/1.8.0.0)   | deprecated     |
+| 8.6.4        | [1.4.0](https://github.com/haskell/haskell-language-server/releases/tag/1.4.0)       | deprecated     |
+
+GHC versions not in the list have never been supported by HLS.
+LTS stands for [Stackage](https://www.stackage.org/) Long Term Support.
+
+The policy for when we deprecate support for versions of GHC is given below.
+The table reflects that, but we may decide to deviate from it for good reasons.
+
+### Using deprecated GHC versions
+
+Users who want to use a GHC version which is not supported by the latest HLS can still use older versions of HLS (consult the version support table above to identify the appropriate HLS version).
+In the future, we may extend the existing discovery mechanisms (`haskell-language-server-wrapper`, automatic download in vscode extension) to find and download older HLS binaries in this case.
+
+Users of a deprecated minor version (where the major version is still supported) can try building the latest HLS from source, which will likely still work, since the GHC API tends to remain compatible across minor versions.
+
+### Using GHC versions not yet supported in a HLS release
+
+Some users may wish to use a version of GHC that is not yet supported by a released version of HLS.
+In particular, this means that pre-built binaries will not be available for that GHC version.
+
+The easiest thing to do in this case is to build HLS from source yourself.
+This can be done easily with `ghcup`, see the examples for `ghcup compile` on the [installation page](../installation.md).
+
+Generally, if a version of GHC is supported by HLS on master _or_ is a new minor version of a GHC version that is supported by HLS on master, then compiling from source is likely to work.
+Major versions of GHC which are not supported by HLS on master are extremely unlikely to work.
+
+## GHC version deprecation policy
+
+### Base policy
+
+This is the static part of the policy that can be checked by a machine.
+
+#### Major versions
+
+HLS will support major versions of GHC until they are older than _both_
+
+1. The major version of GHC used in the current Stackage LTS; and
+2. The major version of GHC recommended by GHCup
+
+For example, if
+
+1. Stackage LTS uses GHC 9.2; and
+2. GHCUp recommends GHC 9.4
+
+then HLS will support back to GHC 9.2.
+
+#### Minor versions
+
+For the latest supported major GHC version we will support at least 2 minor versions.
+
+For the rest of the supported major GHC versions, we will support at least the latest minor version in Stackage LTS (so 1 minor version).
+
+### Extended policy
+
+This is the part of the policy that needs evaluation by a human and possibly followed
+by a discussion.
+
+#### Ecosystem factors
+
+To establish and apply the policy we take the following ecosystem factors into account:
+
+- Support status of HLS
+- The most recent [stackage](https://www.stackage.org/) LTS snapshot
+- The GHC version recommended by GHCup
+- The GHC versions used in the most popular [linux distributions](https://repology.org/project/ghc/versions)
+- The reliability of different ghc versions on the major operating systems (Linux, Windows, MacOS)
+- The [Haskell Survey results](https://taylor.fausak.me/2022/11/18/haskell-survey-results/#s2q4)
+
+### Supporting a GHC version beyond normal deprecation time
+
+In cases where the base policy demands a deprecation, but ecosystem factors
+suggest that it&apos;s still widely used (e.g. last [Haskell Survey results](https://taylor.fausak.me/2022/11/18/haskell-survey-results/#s2q4)),
+the deprecation should be suspended for the next release and the situation be re-evaluated for the release after that.
+
+When we decide to keep on an old version, we should track it as follows:
+
+1. open a ticket on HLS issue tracker wrt discussing to deprecate said GHC version
+    - explain the reason the GHC version wasn&apos;t deprecated (context)
+    - explain the maintenance burden it causes (reason)
+    - evaluate whether it impacts the next HLS release (impact)
+2. discuss whether ecosystem factors changed
+    - e.g. if Haskell Survey results show that 25% or more of users are still on the GHC version in question, then dropping should be avoided
+3. if dropping is still undesired, but maintenance burden is also high, then set out a call-for-help and contact HF for additional funding to support this GHC version
+4. if no help or funding was received within 2 releases (say, e.g. 3-6 months), then drop the version regardless
+
+### Why deprecate older versions of GHC?
+
+`haskell-language-server`(HLS) is highly tied to the GHC API. This imposes a high maintenance cost:
+
+- The codebase is littered with conditional logic
+- We own auxiliary packages to support older versions of GHC
+- CI has to cover all the supported versions
+
+So we need to limit the GHC support to save maintainers and contributors time and reduce CI resources.
+
+At same time we aim to support the right balance of GHC versions to minimize the impact on users.</file><file path="docs/support/index.rst">GHC and Plugin Support
+======================
+
+.. toctree::
+   :maxdepth: 2
+
+   ghc-version-support
+   plugin-support</file><file path="docs/support/plugin-support.md"># Plugin support
+
+## Plugin support tiers
+
+Plugins vary in how well-supported they are, in particular how quickly they are updated to support new GHC versions.
+This is important to keep track of because we want to release new versions of HLS for new GHC versions quickly, but also to present a consistent set of features.
+
+For this reason we group plugins into _support tiers_.
+
+**Tier 1**
+
+A tier 1 plugin is a plugin which we believe is so essential to the functioning of HLS that we should not release HLS unless the plugin is working for all supported GHC versions.
+
+Tier 1 plugins must be well-supported, or else we will be blocked from releasing HLS.
+If we are not able to maintain tier 1 plugins, then we have a critical maintenance problem.
+Consequently, few plugins should be considered tier 1.
+
+**Tier 2**
+
+A tier 2 plugin is a plugin which is important or well-enough maintained that we usually will not release HLS unless the plugin is working for all supported GHC versions.
+
+Tier 2 plugins should be well-supported enough to usually make the cut for HLS releases, but we will not hold a release for one.
+
+Tier 2 plugins provide a decent experience for users, since they can (mostly) rely on them being present in a release.
+Hence, most plugins should ideally be tier 2.
+
+**Tier 3**
+
+A tier 3 plugin is anything else.
+
+Tier 3 plugins are maintained on a best-effort basis, often by irregular contributors.
+A plugin may have to be tier 3 despite being well-maintained if it depends on a tool (e.g. a formatter) which is not itself reliably updated for new GHC versions.
+
+Since we cannot make any guarantees that a tier 3 plugin will be working, they provide a bad experience for users.
+Hence a tier 3 plugin should ideally have some kind of plan for getting out of tier 3, either by getting the plugin to tier 2 or by sunsetting it.
+For example, a plugin to provide a formatter which has itself been abandoned has no hope of reaching tier 2, but may be gracefully sunset by only being supported for old versions of GHC, and deleted once those exit our GHC support window.
+
+## Current plugin support tiers
+
+| Plugin                               | Tier | Unsupported GHC versions |
+| ------------------------------------ | ---- | ------------------------ |
+| ghcide core plugins                  | 1    |                          |
+| `hls-call-hierarchy-plugin`          | 1    |                          |
+| `hls-code-range-plugin`              | 1    |                          |
+| `hls-explicit-imports-plugin`        | 1    |                          |
+| `hls-pragmas-plugin`                 | 1    |                          |
+| `hls-refactor-plugin`                | 2    |                          |
+| `hls-alternate-number-format-plugin` | 2    |                          |
+| `hls-cabal-fmt-plugin`               | 2    |                          |
+| `hls-cabal-gild-plugin`              | 2    |                          |
+| `hls-class-plugin`                   | 2    |                          |
+| `hls-change-type-signature-plugin`   | 2    |                          |
+| `hls-eval-plugin`                    | 2    |                          |
+| `hls-signature-help-plugin`          | 2    |                          |
+| `hls-explicit-fixity-plugin`         | 2    |                          |
+| `hls-explicit-record-fields-plugin`  | 2    |                          |
+| `hls-fourmolu-plugin`                | 2    |                          |
+| `hls-gadt-plugin`                    | 2    |                          |
+| `hls-hlint-plugin`                   | 2    | 9.10 [1]                 |
+| `hls-module-name-plugin`             | 2    |                          |
+| `hls-notes-plugin`                   | 2    |                          |
+| `hls-qualify-imported-names-plugin`  | 2    |                          |
+| `hls-ormolu-plugin`                  | 2    |                          |
+| `hls-rename-plugin`                  | 2    |                          |
+| `hls-stylish-haskell-plugin`         | 2    |                          |
+| `hls-overloaded-record-dot-plugin`   | 2    |                          |
+| `hls-semantic-tokens-plugin`         | 2    |                          |
+| `hls-floskell-plugin`                | 3    | 9.10.1, 9.12.2           |
+| `hls-stan-plugin`                    | 3    | 9.12.2                   |
+| `hls-retrie-plugin`                  | 3    | 9.10.1, 9.12.2           |
+| `hls-splice-plugin`                  | 3    | 9.10.1, 9.12.2           |
+
+[1]: HLint is incompatible with GHC 9.10 series. See the issue [#4674](https://github.com/haskell/haskell-language-server/issues/4674) for discussion and explanation.</file><file path="docs/.gitignore">_build</file><file path="docs/conf.py"># Configuration file for the Sphinx documentation builder.
+#
+# This file only contains a selection of the most common options. For a full
+# list see the documentation:
+# https://www.sphinx-doc.org/en/master/usage/configuration.html
+
+# -- Path setup --------------------------------------------------------------
+
+# If extensions (or modules to document with autodoc) are in another directory,
+# add these directories to sys.path here. If the directory is relative to the
+# documentation root, use os.path.abspath to make it absolute, like shown here.
+#
+# import os
+# import sys
+# sys.path.insert(0, os.path.abspath(&apos;.&apos;))
+
+import re
+import sys
+
+# -- Project information -----------------------------------------------------
+
+project = &apos;haskell-language-server&apos;
+
+# We want to take some of the metadata from the Cabal file, especially the version.
+# (otherwise it&apos;s very easy to forget to update it!)
+release = None
+copyright = None
+author = None
+versionPattern = re.compile(&quot;^version:\s*([\d.]+)&quot;)
+copyrightPattern = re.compile(&quot;^copyright:\s*(.+)&quot;)
+authorPattern = re.compile(&quot;^author:\s*(.+)&quot;)
+for i, line in enumerate(open(&apos;../haskell-language-server.cabal&apos;)):
+    versionMatch = re.search(versionPattern, line)
+    if versionMatch:
+        release = versionMatch.group(1)
+    copyrightMatch = re.search(copyrightPattern, line)
+    if copyrightMatch:
+        copyright = copyrightMatch.group(1)
+    authorMatch = re.search(authorPattern, line)
+    if authorMatch:
+        author = authorMatch.group(1)
+
+if not release:
+    print(&quot;Couldn&apos;t find version&quot;)
+    sys.exit()
+if not copyright:
+    print(&quot;Couldn&apos;t find copyright&quot;)
+    sys.exit()
+if not author:
+    print(&quot;Couldn&apos;t find author&quot;)
+    sys.exit()
+
+# -- General configuration ---------------------------------------------------
+
+# Add any Sphinx extension module names here, as strings. They can be
+# extensions coming with Sphinx (named &apos;sphinx.ext.*&apos;) or your custom
+# ones.
+extensions = [
+    &apos;myst_parser&apos;,
+    &apos;sphinx_rtd_theme&apos;,
+    &apos;sphinx.ext.autosectionlabel&apos;
+]
+
+# Add any paths that contain templates here, relative to this directory.
+templates_path = [&apos;_templates&apos;]
+
+# List of patterns, relative to source directory, that match files and
+# directories to ignore when looking for source files.
+# This pattern also affects html_static_path and html_extra_path.
+exclude_patterns = [&apos;_build&apos;, &apos;Thumbs.db&apos;, &apos;.DS_Store&apos;]
+
+
+# -- Options for HTML output -------------------------------------------------
+
+# The theme to use for HTML and HTML Help pages.  See the documentation for
+# a list of builtin themes.
+#
+html_theme = &apos;sphinx_rtd_theme&apos;
+html_logo = &quot;logos/logo-64.png&quot;
+html_favicon = &quot;logos/logo.svg&quot;
+
+# Add any paths that contain custom static files (such as style sheets) here,
+# relative to this directory. They are copied after the builtin static files,
+# so a file named &quot;default.css&quot; will overwrite the builtin &quot;default.css&quot;.
+html_static_path = [&apos;_static&apos;]
+
+# Enable linking to an anchor of a relative page
+# See https://github.com/executablebooks/MyST-Parser/issues/443
+myst_heading_anchors = 3
+
+# -- Custom Document processing ----------------------------------------------
+
+def setup(app):
+    app.add_css_file(&quot;theme_overrides.css&quot;)</file><file path="docs/configuration.md"># Configuration
+
+## Configuring `haskell-language-server`
+
+Language servers like `haskell-language-server` expose most of their configuration via the client (i.e. the editor).
+That means that the way in which you configure the settings will depend on the client.
+
+Most clients (editors) already have an opinion about how settings should be configured!
+For example, in VS Code you use the graphical Settings tab or `settings.json`, whereas in Emacs you use customization variables.
+In the [editor configuration section](#configuring-your-editor) we give some pointers for popular editors, but you should consult the documentation for your specific editor if you have trouble.
+
+However, we can say some high-level things about the kinds of configuration `haskell-language-server` uses, and how to use them.
+This can sound a bit confusing, but ultimately the client should present you with these options in a user-friendly way that makes sense for that editor.
+
+### Generic server options
+
+The LSP protocol is designed to support many useful server configuration options generically.
+These are sent to the server by the client, and can be controlled without reference to a specific language.
+
+For example, there are protocol methods for highlighting matching identifiers throughout a document.
+This is a capability that any server can implement, so the client can decide generically whether to ask the server to do it or not.
+So your editor can provide a setting to turn this on or off globally, for any language server you might use.
+
+Settings like this are typically provided by the generic LSP client support for your editor, for example in Emacs by [lsp-mode](https://github.com/emacs-lsp/lsp-mode).
+
+### Generic editor options
+
+Your editor may provide some settings that affect how the information from the language server is used.
+For example, whether popups are shown, or whether code lenses appear by default.
+
+Settings like this are typically provided by the generic LSP client support for your editor, for example in Emacs by [lsp-mode](https://github.com/emacs-lsp/lsp-mode).
+
+### Language-specific server options
+
+A specific language server can also have its own configuration options.
+These are still sent to the server by the client, but they can only be controlled by a specific client that knows about those options.
+
+For example, `haskell-language-server` allows you to choose the formatting provider which will be used for formatting Haskell source.
+This option obviously would not make sense for language servers for other languages, or even for other Haskell language servers (which need not even support formatting).
+
+Here is a list of the additional settings currently supported by `haskell-language-server`, along with their setting key (you may not need to know this) and default:
+
+- Formatting provider (`haskell.formattingProvider`, default `ormolu`): what formatter to use; one of `floskell`, `ormolu`, `fourmolu`, or `stylish-haskell`.
+- Cabal formatting provider (`haskell.cabalFormattingProvider`, default `cabal-gild`): what formatter to use for cabal files; one of `cabal-gild` or `cabal-fmt`.
+- Max completions (`haskell.maxCompletions`, default 40): maximum number of completions sent to the LSP client.
+- Check project (`haskell.checkProject`, default true): whether to typecheck the entire project on initial load. As it is activated by default could drive to bad performance in large projects.
+- Check parents (`haskell.checkParents`, default `CheckOnSave`): when to typecheck reverse dependencies of a file; one of `NeverCheck`, `CheckOnSave` (means dependent/parent modules will only be checked when you save), or `AlwaysCheck` (means re-typechecking them on every change).
+- Session loading preference (`haskell.sessionLoading`, default `singleComponent`): how to load sessions; one of `singleComponent` (means always loading only a single component when a new component is discovered) or `multipleComponents` (means always preferring loading multiple components in the cradle at once). `multipleComponents` might not be always possible, if the tool doesn&apos;t support multiple components loading. The cradle can decide how to handle these situations, and whether to honour the preference at all.
+
+#### Generic plugin configuration
+
+Plugins have a generic config to control their behaviour. The schema of such config is:
+
+- `haskell.plugin.${pluginName}.globalOn`: usually with default true. Whether the plugin is enabled at runtime or it is not. That is the option you might use if you want to disable completely a plugin.
+  - Actual plugin names are: `ghcide-code-actions-fill-holes`, `ghcide-completions`, `ghcide-hover-and-symbols`, `ghcide-type-lenses`, `ghcide-code-actions-type-signatures`, `ghcide-code-actions-bindings`, `ghcide-code-actions-imports-exports`, `eval`, `moduleName`, `pragmas`, `importLens`, `class`, `hlint`, `retrie`, `rename`, `splice`, `stan`, `signatureHelp`.
+  - So to disable the import lens with an explicit list of module definitions you could set `haskell.plugin.importLens.globalOn: false`
+- `haskell.plugin.${pluginName}.${lspCapability}On`: usually with default true. Whether a concrete plugin capability is enabled.
+  - Capabilities are the different ways a lsp server can interact with the editor. The current available capabilities of the server are: `callHierarchy`, `codeActions`, `codeLens`, `diagnostics`, `hover`, `symbols`, `completion`, `rename`.
+  - Note that usually plugins don&apos;t provide all capabilities but some of them or even only one.
+  - So to disable code changes suggestions from the `hlint` plugin (but no diagnostics) you could set `haskell.plugin.hlint.codeActionsOn: false`
+- Plugin specific configuration:
+  - `eval`:
+    - `haskell.plugin.eval.config.diff`, default true: When reloading haddock test results in changes, mark it with WAS/NOW.
+    - `haskell.plugin.eval.config.exception`, default false: When the command results in an exception, mark it with `*** Exception:`.
+  - `rename`:
+    - `haskell.plugin.rename.config.crossModule`, default false: Enables renaming across modules (experimental)
+  - `ghcide-completions`:
+    - `haskell.plugin.ghcide-completions.config.snippetsOn`, default true: Inserts snippets when using code completions.
+    - `haskell.plugin.ghcide-completions.config.autoExtendOn`, default true: Extends the import list automatically when completing a out-of-scope identifier.
+  - `ghcide-type-lenses`:
+    - `haskell.plugin.ghcide-type-lenses.config.mode`, default `always`: Control how type lenses are shown. One of `always`, `exported`, `diagnostics`.
+  - `hlint`:
+    - `haskell.plugin.hlint.config.flags`, default empty: List of flags used by hlint.
+  - `ormolu`:
+    - `haskell.plugin.ormolu.config.external`, default `false`: Use an external `ormolu` executable rather than the one packaged with HLS.
+  - `fourmolu`:
+    - `haskell.plugin.fourmolu.config.external`, default `false`: Use an external `fourmolu` executable rather than the one packaged with HLS.
+This reference of configuration can be outdated at any time but we can query the `haskell-server-executable` about what configuration is effectively used:
+- `haskell-language-server generate-default-config`: will print the json configuration with all default values. It can be used as template to modify it.
+- `haskell-language-server vscode-extension-schema`: will print a json schema used to setup the haskell vscode extension. But it is useful to see what range of values can an option take and a description about it.
+
+Settings like this are typically provided by the language-specific LSP client support for your editor, for example in Emacs by `lsp-haskell`.
+
+### Client options
+
+A particular client might also have some options of its own, for example to control how the server executable is started.
+
+Settings like this are typically be provided by the language-specific LSP client support for your editor, for example in Emacs by `lsp-haskell`.
+
+## Configuring your project build
+
+`haskell-language-server` has to compile your project in order to give you diagnostics, which means that it needs to know how to do so.
+This is handled under the hood by the [hie-bios](https://github.com/mpickering/hie-bios) application.
+In turn, `hie-bios` needs some configuration to identify all files, GHC options, etc., needed to compile a project.
+
+There are several ways to provide this configuration to `hie-bios`, detailed below.
+
+### Implicit configuration
+If no `hie.yaml` file is present, `haskell-language-server` automatically detects your `hie-bios` configuration using [implicit-hie](https://github.com/Avi-D-coder/implicit-hie).
+**For most cases, this works just fine, and is the recommended way.**
+
+### Explicit, generated configuration
+Maybe using the implicit configuration does not suit you.
+E.g., it does not work, or you prefer to have explicit configuration in your project.
+In that case, you can automatically generate a `hie.yaml` file, using [implicit-hie](https://github.com/Avi-D-coder/implicit-hie):
+
+```shell
+gen-hie &gt; hie.yaml  # In the root directory of your project
+```
+
+### Explicit, manual configuration
+Maybe using the generated `hie.yaml` file does not suit you.
+E.g., it still does not work, or you want to fine-tune the configuration.
+
+In that case, refer to the [hie-bios explicit configuration documentation](https://github.com/haskell/hie-bios#explicit-configuration).
+Keep in mind that you can start from the `hie.yaml` file generated by `implicit-hie` (see previous section) and modify it to your liking.
+
+#### Examples of explicit `hie.yaml` configurations
+
+##### Basic Stack
+```yaml
+cradle:
+  stack:
+```
+
+##### Basic Cabal
+```yaml
+cradle:
+  cabal:
+```
+
+##### Single Stack component
+
+```yaml
+cradle:
+  stack:
+    component: &quot;haskell-language-server:lib&quot;
+```
+
+##### Single Cabal component
+
+```yaml
+cradle:
+  cabal:
+    component: &quot;lib:haskell-language-server&quot;
+```
+
+##### Multiple Stack components
+
+```yaml
+cradle:
+  stack:
+    - path: &quot;./test/functional/&quot;
+      component: &quot;haskell-language-server:func-test&quot;
+    - path: &quot;./exe/Main.hs&quot;
+      component: &quot;haskell-language-server:exe:haskell-language-server&quot;
+    - path: &quot;./exe/Wrapper.hs&quot;
+      component: &quot;haskell-language-server:exe:haskell-language-server-wrapper&quot;
+    - path: &quot;./src&quot;
+      component: &quot;haskell-language-server:lib&quot;
+    - path: &quot;./ghcide/src&quot;
+      component: &quot;ghcide:lib:ghcide&quot;
+    - path: &quot;./ghcide/exe&quot;
+      component: &quot;ghcide:exe:ghcide&quot;
+```
+
+##### Multiple Cabal components
+
+```yaml
+cradle:
+  cabal:
+    - path: &quot;./test/functional/&quot;
+      component: &quot;haskell-language-server:func-test&quot;
+    - path: &quot;./test/utils/&quot;
+      component: &quot;haskell-language-server:hls-test-utils&quot;
+    - path: &quot;./exe/Main.hs&quot;
+      component: &quot;haskell-language-server:exe:haskell-language-server&quot;
+    - path: &quot;./exe/Wrapper.hs&quot;
+      component: &quot;haskell-language-server:exe:haskell-language-server-wrapper&quot;
+    - path: &quot;./src&quot;
+      component: &quot;lib:haskell-language-server&quot;
+    - path: &quot;./ghcide/src&quot;
+      component: &quot;ghcide:lib:ghcide&quot;
+    - path: &quot;./ghcide/exe&quot;
+      component: &quot;ghcide:exe:ghcide&quot;
+```
+
+##### Custom program
+You can explicitly state the program which should be used to collect
+the options by supplying the path to the program. It is interpreted
+relative to the current working directory if it is not an absolute path.
+
+```yaml
+cradle:
+  bios:
+    program: &quot;.hie-bios&quot;
+```
+
+The complete configuration is a subset of
+
+```yaml
+cradle:
+  cabal:
+    component: &quot;optional component name&quot;
+  stack:
+    component: &quot;optional component name&quot;
+  bios:
+    program: &quot;program to run&quot;
+    dependency-program: &quot;optional program to run&quot;
+  direct:
+    arguments: [&quot;list&quot;,&quot;of&quot;,&quot;ghc&quot;,&quot;arguments&quot;]
+  default:
+  none:
+
+dependencies:
+  - someDep
+```
+
+### How to show local documentation on hover
+
+Haskell Language Server can display Haddock documentation on hover and completions if the project and
+its dependencies have been built with the `-haddock` GHC flag.
+
+- For cabal:
+
+  - Add to your global config file (e.g. `~/.cabal/config`):
+
+    ```yaml
+    program-default-options
+      ghc-options: -haddock
+    ```
+
+  - Or, for a single project, run `cabal configure --ghc-options=-haddock`
+
+- For stack, add to global `$STACK_ROOT\config.yaml`, or project&apos;s `stack.yaml`:
+
+  ```yaml
+  ghc-options:
+    &apos;$everything&apos;: -haddock
+  ```
+
+  Note that this flag will cause compilation errors if a dependency contains invalid Haddock markup,
+  until GHC 9.0 which [will report warnings](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/2377)
+  instead.
+
+
+## Configuring your editor
+
+Most editors provide a Haskell-specific extension that provides support for launching `haskell-language-server` and talking to it, as well as [exposing configuration options](#configuring-haskell-language-server).
+
+Editors typically assume that you have already installed `haskell-language-server` (see above) and that the installation script put the `haskell-language-server` and `haskell-language-server-wrapper` binaries in your `PATH` (usually `~/.local/bin` or `~/.cabal/bin` on Linux and macOS, `%APPDATA%\local\bin` or `%APPDATA%\cabal\bin` on Windows).
+The exception is VS Code, which can automatically install the binaries if they are not installed already.
+
+### VS Code
+
+Install from
+[the VSCode marketplace](https://marketplace.visualstudio.com/items?itemName=haskell.haskell), or manually from the repository [vscode-haskell](https://github.com/haskell/vscode-haskell).
+The `haskell-language-server` and `haskell-language-server-wrapper` binaries will be automatically downloaded on an ad-hoc basis, but if you have them already installed on your PATH then it will just use them instead.
+
+Configuration is done via the &quot;Haskell&quot; section of &quot;Settings&quot;.
+
+### Sublime Text
+
+Install [LSP](https://packagecontrol.io/packages/LSP) using [Package Control](https://packagecontrol.io/).
+
+Open `Preferences &gt; Package Settings &gt; LSP &gt; Settings` and add the following &quot;haskell-language-server&quot; client configuration to the &quot;clients&quot; key:
+
+```json
+{
+    &quot;clients&quot;: {
+        &quot;haskell-language-server&quot;: {
+            &quot;enabled&quot;: true,
+            &quot;command&quot;: [&quot;haskell-language-server-wrapper&quot;, &quot;--lsp&quot;],
+            &quot;selector&quot;: &quot;source.haskell&quot;
+        }
+    }
+}
+
+```
+
+See [the Sublime Text LSP documentation](https://lsp.sublimetext.io) for information on configuring the client. In particular, you can add a &quot;settings&quot; key to the &quot;haskell-language-server&quot; setting to configure specific HLS plugins as described elsewhere in these docs.
+
+### [Neovim](https://neovim.io)
+
+Neovim provides a [native LSP implementation with a Lua framework](https://neovim.io/doc/user/lsp).
+Plugins that streamline the setup of `haskell-language-server` using Neovim&apos;s built-in LSP framework include:
+
+* [haskell-tools.nvim](https://github.com/MrcJkb/haskell-tools.nvim): A plugin with a focus on Haskell tooling, including `haskell-language-server`.
+* [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig): A collection of quickstart configs for various LSP servers.
+  - Includes a basic [`hls` configuration](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#hls).
+
+Neovim is also compatible with the [Vim plugins](#vim).
+
+### [Vim](https://www.vim.org)
+
+You can use [Coc](https://github.com/neoclide/coc.nvim), [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim)
+or any other Vim Language server protocol client.
+Coc is recommend since it is the only complete LSP implementation for Vim and offers snippets and floating documentation out of the box.
+
+#### Coc
+
+Follow Coc&apos;s [installation instructions](https://github.com/neoclide/coc.nvim).
+Then issue `:CocConfig` and add the following to your Coc config file.
+
+##### Minimal Example
+
+```json
+{
+  &quot;languageserver&quot;: {
+    &quot;haskell&quot;: {
+      &quot;command&quot;: &quot;haskell-language-server-wrapper&quot;,
+      &quot;args&quot;: [&quot;--lsp&quot;],
+      &quot;rootPatterns&quot;: [&quot;*.cabal&quot;, &quot;stack.yaml&quot;, &quot;cabal.project&quot;, &quot;package.yaml&quot;, &quot;hie.yaml&quot;],
+      &quot;filetypes&quot;: [&quot;haskell&quot;, &quot;lhaskell&quot;]
+    }
+  }
+}
+```
+
+##### Example with Settings
+
+```json
+{
+  &quot;languageserver&quot;: {
+    &quot;haskell&quot;: {
+      &quot;command&quot;: &quot;haskell-language-server-wrapper&quot;,
+      &quot;args&quot;: [&quot;--lsp&quot;],
+      &quot;rootPatterns&quot;: [ &quot;*.cabal&quot;, &quot;stack.yaml&quot;, &quot;cabal.project&quot;, &quot;package.yaml&quot;, &quot;hie.yaml&quot; ],
+      &quot;filetypes&quot;: [&quot;haskell&quot;, &quot;lhaskell&quot;],
+      &quot;settings&quot;: {
+        &quot;haskell&quot;: {
+          &quot;checkParents&quot;: &quot;CheckOnSave&quot;,
+          &quot;checkProject&quot;: true,
+          &quot;maxCompletions&quot;: 40,
+          &quot;formattingProvider&quot;: &quot;ormolu&quot;,
+          &quot;plugin&quot;: {
+            &quot;stan&quot;: { &quot;globalOn&quot;: true }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+#### LanguageClient-neovim
+
+##### vim-plug
+
+If you use [vim-plug](https://github.com/junegunn/vim-plug), then you can do this by e.g.,
+including the following line in the Plug section of your `init.vim` or `~/.vimrc`:
+
+```text
+Plug &apos;autozimu/LanguageClient-neovim&apos;, {
+    \ &apos;branch&apos;: &apos;next&apos;,
+    \ &apos;do&apos;: &apos;bash install.sh&apos;
+    \ }
+```
+
+and issuing a `:PlugInstall` command within Neovim or Vim.
+
+##### Clone the LanguageClient-neovim repo
+
+As an alternative to using [vim-plug](https://github.com/junegunn/vim-plug) shown above, clone [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim)
+into `~/.vim/pack/XXX/start/`, where `XXX` is just a name for your &quot;plugin suite&quot;.
+
+##### Configuration and sample `~/.vimrc` sections
+
+```vim
+set rtp+=~/.vim/pack/XXX/start/LanguageClient-neovim
+let g:LanguageClient_serverCommands = { &apos;haskell&apos;: [&apos;haskell-language-server-wrapper&apos;, &apos;--lsp&apos;] }
+```
+
+You&apos;ll probably want to add some mappings for common commands:
+
+```vim
+nnoremap &lt;F5&gt; :call LanguageClient_contextMenu()&lt;CR&gt;
+map &lt;Leader&gt;lk :call LanguageClient#textDocument_hover()&lt;CR&gt;
+map &lt;Leader&gt;lg :call LanguageClient#textDocument_definition()&lt;CR&gt;
+map &lt;Leader&gt;lr :call LanguageClient#textDocument_rename()&lt;CR&gt;
+map &lt;Leader&gt;lf :call LanguageClient#textDocument_formatting()&lt;CR&gt;
+map &lt;Leader&gt;lb :call LanguageClient#textDocument_references()&lt;CR&gt;
+map &lt;Leader&gt;la :call LanguageClient#textDocument_codeAction()&lt;CR&gt;
+map &lt;Leader&gt;ls :call LanguageClient#textDocument_documentSymbol()&lt;CR&gt;
+```
+
+Use &lt;kbd&gt;Ctrl+x&lt;/kbd&gt;&lt;kbd&gt;Ctrl+o&lt;/kbd&gt; (`&lt;C-x&gt;&lt;C-o&gt;`) to open up the auto-complete menu,
+or for asynchronous auto-completion, follow the setup instructions on
+[LanguageClient](https://github.com/autozimu/LanguageClient-neovim).
+
+If you&apos;d like diagnostics to be highlighted, add a highlight group for `ALEError`/`ALEWarning`/`ALEInfo`,
+or customize `g:LanguageClient_diagnosticsDisplay`:
+
+```vim
+hi link ALEError Error
+hi Warning term=underline cterm=underline ctermfg=Yellow gui=undercurl guisp=Gold
+hi link ALEWarning Warning
+hi link ALEInfo SpellCap
+```
+
+If you&apos;re finding that the server isn&apos;t starting at the correct project root,
+it may also be helpful to also specify root markers:
+
+```vim
+let g:LanguageClient_rootMarkers = [&apos;*.cabal&apos;, &apos;stack.yaml&apos;]
+```
+
+Further configuration can be done by pointing the `g:LanguageClient_settingsPath` [option](https://github.com/autozimu/LanguageClient-neovim/blob/0e5c9546bfddbaa2b01e5056389c25aefc8bf989/doc/LanguageClient.txt#L221)
+variable to the file in which you want to keep your LSP settings.
+
+### Atom
+
+Install the two Atom packages [atom-ide-ui](https://atom.io/packages/atom-ide-ui) and [haskell](https://atom.io/packages/haskell),
+
+```bash
+$ apm install language-haskell atom-ide-ui haskell
+```
+
+### [Emacs](https://www.gnu.org/software/emacs/)
+
+Emacs support can be provided by different combinations of packages:
+
+- [eglot](https://github.com/joaotavora/eglot) (built-in from Emacs 29 onwards)
+
+or
+
+- [lsp-mode](https://github.com/emacs-lsp/lsp-mode),
+  [lsp-ui](https://github.com/emacs-lsp/lsp-ui) and
+  [lsp-haskell](https://github.com/emacs-lsp/lsp-haskell)
+
+You can install these manually if you are using plain Emacs; instructions for some specific flavours
+are included below.
+
+Make sure to check the READMEs of each of these packages, which explain how to configure the
+various parts of the Emacs integration.
+In particular, `lsp-haskell` provides customization options for the `haskell-language-server`-specific parts,
+such as the path to the server executable.
+
+#### [use-package](https://github.com/jwiegley/use-package) [eglot](https://github.com/joaotavora/eglot)
+
+If you are using vanilla emacs with `use-package`, put the following into your `~/.emacs`.
+This will install `eglot` and enable it by default in `haskell-mode`.
+To configure `haskell-language-server` we use the `eglot-workspace-configuration` variable.
+With `M-x eglot-show-workspace-configuration` you can see the JSON that `eglot` will send to `haskell-language-server`.
+See &lt;https://joaotavora.github.io/eglot/#Customizing-Eglot&gt; for more information.
+As an example, the setting below will disable the `stan` plugin and use `fourmolu` for formatting:
+
+```emacs-lisp
+(use-package eglot
+  :ensure t
+  :config
+  (add-hook &apos;haskell-mode-hook &apos;eglot-ensure) ; start eglot automatically in haskell projects
+  :config
+  (setq-default eglot-workspace-configuration
+                &apos;(:haskell (:plugin (:stan (:globalOn :json-false)) ; disable stan
+                            :formattingProvider &quot;fourmolu&quot;)))       ; use fourmolu instead of ormolu
+  :custom
+  (eglot-autoshutdown t)  ; shutdown language server after closing last file
+  (eglot-confirm-server-initiated-edits nil)  ; allow edits without confirmation
+  )
+```
+
+#### [doom-emacs](https://github.com/hlissner/doom-emacs/tree/develop/modules/lang/haskell#module-flags)
+
+Manual installation of packages is not required.
+Enable the lsp module and the haskell lang module with lsp flag in `.doom.d/init.el`:
+
+``` emacs-lisp
+:tools
+lsp
+;; ...
+:lang
+(haskell +lsp)
+```
+
+then do `$HOME/.emacs.d/bin/doom sync`
+
+#### [Spacemacs](https://github.com/syl20bnr/spacemacs)
+
+Manual installation of packages is not required.
+Enable the `haskell` layer and the `lsp` layer in your Spacemacs config file:
+
+```emacs-lisp
+dotspacemacs-configuration-layers
+  &apos;(
+    haskell
+    lsp
+    ;; ...
+  )
+```
+
+### [Kakoune](https://github.com/mawww/kakoune)
+
+1. Grab a copy of [kak-lsp](https://github.com/ul/kak-lsp), and follow the setup instructions.
+2. Point your `kak-lsp.toml` to `haskell-language-server-wrapper`.
+
+```toml
+[language.haskell]
+filetypes = [&quot;haskell&quot;]
+roots = [&quot;Setup.hs&quot;, &quot;stack.yaml&quot;, &quot;*.cabal&quot;]
+command = &quot;haskell-language-server-wrapper&quot;
+args = [&quot;--lsp&quot;]
+```
+
+### [Helix](https://github.com/helix-editor/helix)
+
+Once `haskell-language-server-wrapper` is installed in your system, it will be used automatically by the editor.
+For more details please refer to the [helix guide on installing language servers](https://github.com/helix-editor/helix/wiki/How-to-install-the-default-language-servers)</file><file path="docs/features.md"># Features
+
+This table gives a summary of the features that HLS supports.
+Many of these are standard LSP features, but a lot of special features are provided as [code actions](#code-actions) and [code lenses](#code-lenses).
+
+| Feature                                             | [LSP method](./what-is-hls.md#lsp-terminology)                                                    |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [Diagnostics](#diagnostics)                         | `textDocument/publishDiagnostics`                                                                 |
+| [Hovers](#hovers)                                   | `textDocument/hover`                                                                              |
+| [Signature help](#signature-help)                   | `textDocument/signatureHelp`                                                                      |
+| [Jump to definition](#jump-to-definition)           | `textDocument/definition`                                                                         |
+| [Jump to type definition](#jump-to-type-definition) | `textDocument/typeDefinition`                                                                     |
+| [Find references](#find-references)                 | `textDocument/references`                                                                         |
+| [Completions](#completions)                         | `textDocument/completion`                                                                         |
+| [Formatting](#formatting)                           | `textDocument/formatting`, `textDocument/rangeFormatting`                                         |
+| [Document symbols](#document-symbols)               | `textDocument/documentSymbol`                                                                     |
+| [Workspace symbols](#workspace-symbols)             | `workspace/symbol`                                                                                |
+| [Call hierarchy](#call-hierarchy)                   | `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`, `callHierarchy/outgoingCalls` |
+| [Highlight references](#highlight-references)       | `textDocument/documentHighlight`                                                                  |
+| [Code actions](#code-actions)                       | `textDocument/codeAction`                                                                         |
+| [Code lenses](#code-lenses)                         | `textDocument/codeLens`                                                                           |
+| [Selection range](#selection-range)                 | `textDocument/selectionRange`                                                                     |
+| [Rename](#rename)                                   | `textDocument/rename`                                                                             |
+| [Semantic tokens](#semantic-tokens)                 | `textDocument/semanticTokens/full`                                                                |
+
+The individual sections below also identify which [HLS plugin](./what-is-hls.md#hls-plugins) is responsible for providing the given functionality, which is useful if you want to raise an issue report or contribute!
+Additionally, not all plugins are supported on all versions of GHC, see the [plugin support page](./support/plugin-support.md) for details.
+
+## Diagnostics
+
+### GHC compiler errors and warnings
+
+Provided by: `ghcide`
+
+Provides errors and warnings from GHC as diagnostics.
+
+### Hlint hints
+
+Provided by: `hls-hlint-plugin`
+
+Provides hlint hints as diagnostics.
+
+### Stan hints
+
+Provided by: `hls-stan-plugin`
+
+Provides Stan hints as diagnostics.
+
+### Cabal parse errors and warnings
+
+Provided by: `hls-cabal-plugin`
+
+Provides errors and warnings from Cabal as diagnostics
+
+## Hovers
+
+Provided by: `ghcide`
+
+Type information and documentation on hover, [including from local definitions](./configuration.md#how-to-show-local-documentation-on-hover).
+
+### Show fixity
+
+Provided by: `hls-explicit-fixity-plugin`
+
+Provides fixity information.
+
+## Signature help
+
+Provided by: `hls-signature-help-plugin`
+
+Shows and highlights the function signature, the function documentation and the arguments documentation when the cursor is at a function argument.
+
+## Jump to definition
+
+Provided by: `ghcide`
+
+Jump to the definition of a name.
+
+Known limitations:
+
+- Only works for [local definitions](https://github.com/haskell/haskell-language-server/issues/708).
+
+## Jump to type definition
+
+Provided by: `ghcide`
+
+Known limitations:
+
+- Only works for [local definitions](https://github.com/haskell/haskell-language-server/issues/708).
+
+## Jump to implementation
+
+Provided by: `ghcide`
+
+Jump to the implementation instance of a type class method.
+
+Known limitations:
+
+- Only works for [local definitions](https://github.com/haskell/haskell-language-server/issues/708).
+
+## Jump to note definition
+
+Provided by: `hls-notes-plugin`
+
+Jump to the definition of a [GHC-style note](https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/coding-style#2-using-notes).
+
+## Find references
+
+Provided by: `ghcide`
+
+Find references to a name within the project.
+
+## Completions
+
+### Code completions
+
+Provided by: `ghcide`
+
+- Completion of names from qualified imports.
+- Completion of names from non-imported modules.
+
+### Pragma completions
+
+Provided by: `hls-pragmas-plugin`
+
+Completions for language pragmas.
+
+## Formatting
+
+Format your code with various Haskell code formatters.
+The default Haskell code formatter is `ormolu`, and the Haskell formatter can be configured via the `formattingProvider` option.
+
+| Formatter       | Provided by                  |
+| --------------- | ---------------------------- |
+| Floskell        | `hls-floskell-plugin`        |
+| Fourmolu        | `hls-fourmolu-plugin`        |
+| Ormolu          | `hls-ormolu-plugin`          |
+| Stylish Haskell | `hls-stylish-haskell-plugin` |
+
+---
+
+Format your cabal files with a cabal code formatter.
+The default cabal code formatter is `cabal-gild`, which needs to be available on the `$PATH`,
+or the location needs to be explicitly provided.
+To change the cabal formatter, edit the `cabalFormattingProvider` option.
+
+| Formatter       | Provided by                  |
+|-----------------|------------------------------|
+| cabal-fmt       | `hls-cabal-fmt-plugin`       |
+| cabal-gild      | `hls-cabal-gild-plugin`      |
+
+## Document symbols
+
+Provided by: `ghcide`
+
+Provides listing of the symbols defined in a module, used to power outline displays.
+
+## Workspace symbols
+
+Provided by: `ghcide`
+
+Provides listing of the symbols defined in the project, used to power searches.
+
+## Call hierarchy
+
+Provided by: `hls-call-hierarchy-plugin`
+
+Shows ingoing and outgoing calls for a function.
+
+![Call Hierarchy in VSCode](../plugins/hls-call-hierarchy-plugin/call-hierarchy-in-vscode.gif)
+
+## Highlight references
+
+Provided by: `ghcide`
+
+Highlights references to a name in a document.
+
+## Code actions
+
+### Insert missing pragmas
+
+Provided by: `hls-pragma-plugin`
+
+Code action kind: `quickfix`
+
+Inserts missing pragmas needed by GHC.
+
+### Apply Hlint fixes
+
+Provided by: `hls-hlint-plugin`
+
+Code action kind: `quickfix`
+
+Applies hints, either individually or for the whole file.
+Uses [apply-refact](https://github.com/mpickering/apply-refact).
+
+![Hlint Demo](https://user-images.githubusercontent.com/54035/110860028-8f9fa900-82bc-11eb-9fe5-6483d8bb95e6.gif)
+
+Known limitations:
+
+- May have strange behaviour in files with CPP, since `apply-refact` does not support CPP.
+- The `hlint` executable by default turns on many extensions when parsing a file because it is not certain about the exact extensions that apply to the file (they may come from project files). This differs from HLS which uses only the extensions the file needs to parse the file. Hence it is possible for the `hlint` executable to report a parse error on a file, but the `hlint` plugin to work just fine on the same file. This does mean that the turning on/off of extensions in the hlint config may be ignored by the `hlint` plugin.
+- Hlint restrictions do not work (yet). This [PR](https://github.com/ndmitchell/hlint/pull/1340) should enable that functionality, but this requires a newer version of hlint to be used in HLS.
+
+### Make import lists fully explicit
+
+Provided by: `hls-explicit-imports-plugin`
+
+Code action kind: `quickfix.literals.style`
+
+Make import lists fully explicit (same as the code lens).
+
+### Refine import
+
+Provided by: `hls-explicit-imports-plugin`
+
+Code action kind: `quickfix.import.refine`
+
+Refines imports to more specific modules when names are re-exported (same as the code lens).
+
+### Qualify imported names
+
+Provided by: `hls-qualify-imported-names-plugin`
+
+Code action kind: `quickfix`
+
+Rewrites imported names to be qualified.
+
+![Qualify Imported Names Demo](../plugins/hls-qualify-imported-names-plugin/qualify-imported-names-demo.gif)
+
+For usage see the [readme](https://github.com/haskell/haskell-language-server/blob/master/plugins/hls-qualify-imported-names-plugin/README.md).
+
+### Add missing class methods
+
+Provided by: `hls-class-plugin`
+
+Code action kind: `quickfix`
+
+Adds placeholders for missing class methods in a class instance definition.
+
+### Unfold definition
+
+Provided by: `hls-retrie-plugin`
+
+Code action kind: `refactor.extract`
+
+Extracts a definition from the code.
+
+### Fold definition
+
+Provided by: `hls-retrie-plugin`
+
+Code action kind: `refactor.inline`
+
+Inlines a definition from the code.
+
+![Retrie Demo](https://i.imgur.com/Ev7B87k.gif)
+
+### Insert contents of Template Haskell splice
+
+Provided by: `hls-splice-plugin`
+
+Code action kind: `refactor.rewrite`
+
+Evaluates a Template Haskell splice and inserts the resulting code in its place.
+
+### Convert numbers to alternative formats
+
+Provided by: `hls-alternate-number-format-plugin`
+
+Code action kind: `quickfix.literals.style`
+
+Converts numeric literals to different formats.
+
+![Alternate Number Format Demo](../plugins/hls-alternate-number-format-plugin/HLSAll.gif)
+
+### Change Type Signature
+
+Provided by: `hls-change-type-signature-plugin`
+
+Code action kind: `quickfix`
+
+Change/Update a type signature to match implementation.
+
+Status: Until GHC 9.4, the implementation is ad-hoc and relies on GHC error messages to create a new signature. Not all GHC error messages are supported.
+
+Known Limitations:
+
+- Not all GHC error messages are supported
+- Top-level and Function-local bindings with the same names can cause issues, such as incorrect signature changes or no code actions available.
+
+![Change Type Signature Demo](../plugins/hls-change-type-signature-plugin/change1.gif)
+
+![Change Type Signature Demo](../plugins/hls-change-type-signature-plugin/change2.gif)
+
+[Link to Docs](https://github.com/haskell/haskell-language-server/blob/master/plugins/hls-change-type-signature-plugin/README.md)
+
+### Add argument to function
+
+Provided by: `hls-refactor-plugin`
+
+Code action kind: `quickfix`
+
+Add an undefined variable as an argument to the top-level binding.
+
+### Convert to GADT syntax
+
+Provided by: `hls-gadt-plugin`
+
+Code action kind: `refactor.rewrite`
+
+Convert a datatype to GADT syntax.
+
+![GADT Demo](../plugins/hls-gadt-plugin/gadt.gif)
+
+[Link to Docs](https://github.com/haskell/haskell-language-server/blob/master/plugins/hls-gadt-plugin/README.md)
+
+### Expand record wildcard
+
+Provided by: `hls-explicit-record-fields-plugin`
+
+Code action kind: `refactor.rewrite`
+
+Expand record wildcards, explicitly listing all record fields as field puns.
+
+![Explicit Wildcard Demo](../plugins/hls-explicit-record-fields-plugin/wildcard.gif)
+
+### Unknown SPDX License suggestion
+
+Provided by: `hls-cabal-plugin`
+
+Code action kind: `quickfix`
+
+Correct common misspelling of SPDX Licenses such as `BSD-3-Clause`.
+
+### Add dependency to `cabal` file
+
+Provided by: `hls-cabal-plugin`
+
+Code action kind: `quickfix`
+
+Add a missing package dependency to your `.cabal` file.
+
+## Code lenses
+
+### Add type signature
+
+Provided by: `ghcide`
+
+Shows the type signature for bindings without type signatures, and adds it with a click.
+
+### Evaluation code snippets in comments
+
+Provided by: `hls-eval-plugin`
+
+Evaluates code blocks in comments with a click.  A code action is also provided. [Tutorial](https://github.com/haskell/haskell-language-server/blob/master/plugins/hls-eval-plugin/README.md).
+
+![Eval Demo](../plugins/hls-eval-plugin/demo.gif)
+
+Known limitations:
+
+- Standard input is shared with HLS, so e.g. [`getLine` breaks the connection to server](https://github.com/haskell/haskell-language-server/issues/2913).
+- Standard (error) output [is not captured](https://github.com/haskell/haskell-language-server/issues/1977).
+- While similar to [doctest](https://hackage.haskell.org/package/doctest), some of its features are unsupported,
+  see [Differences with doctest](https://github.com/haskell/haskell-language-server/blob/master/plugins/hls-eval-plugin/README.md#differences-with-doctest).
+
+### Make import lists fully explicit code lens
+
+Provided by: `hls-explicit-imports-plugin`
+
+Shows fully explicit import lists and rewrites them with a click (same as the code action).
+
+![Imports code lens Demo](https://imgur.com/pX9kvY4.gif)
+
+### Refine import code lens
+
+Provided by: `hls-explicit-imports-plugin`
+
+Shows refined imports and applies them with a click (same as the code action).
+
+### Fix module names
+
+Provided by: `hls-module-name-plugin`
+
+Shows module name matching file path, and applies it with a click.
+
+![Module Name Demo](https://user-images.githubusercontent.com/54035/110860755-78ad8680-82bd-11eb-9845-9ea4b1cc1f76.gif)
+
+## Selection range
+
+Provided by: `hls-code-range-plugin`
+
+Provides haskell specific
+[shrink/expand selection](https://code.visualstudio.com/docs/editor/codebasics#_shrinkexpand-selection)
+support.
+
+![Selection range demo](https://user-images.githubusercontent.com/16440269/177240833-7dc8fe39-b446-477e-b5b1-7fc303608d4f.gif)
+
+## Folding range
+
+Provided by: `hls-code-range-plugin`
+
+Provides haskell specific
+[Folding](https://code.visualstudio.com/docs/editor/codebasics#_folding)
+support.
+
+![Folding range demo](https://user-images.githubusercontent.com/54478821/184468510-7c0d5182-c684-48ef-9b39-3866dc2309df.gif)
+
+## Rename
+
+Provided by: `hls-rename-plugin`
+
+Provides renaming of symbols within a module. Experimental cross-module renaming can be enabled via the configuration.
+
+![Rename Demo](https://user-images.githubusercontent.com/30090176/133072143-d7d03ec7-3db1-474e-ad5e-6f40d75ff7ab.gif)
+
+Known limitations:
+
+- Cross-module renaming requires all components to be indexed, which sometimes causes [partial renames in multi-component projects](https://github.com/haskell/haskell-language-server/issues/2193).
+
+To eagerly load all components, you need to
+
+- set `haskell.sessionLoading` to `multipleComponents`,
+- set `hie.yaml` to load all components (currently only cabal supports this),
+  ```yaml
+  cradle:
+    cabal:
+      component: all
+  ```
+- and enable tests and benchmarks in `cabal.project` with `tests: True` and `benchmarks: True`.
+
+## Semantic tokens
+
+Provided by: `hls-semantic-tokens-plugin`
+
+Provides semantic tokens for each token in the source code to support semantic highlighting.
+
+## Rewrite to overloaded record syntax
+
+Provided by: `hls-overloaded-record-dot-plugin`
+
+Code action kind: `refactor.rewrite`
+
+Rewrites record selectors to use overloaded dot syntax
+
+![Explicit Wildcard Demo](../plugins/hls-overloaded-record-dot-plugin/example.gif)
+
+## Missing features
+
+The following features are supported by the LSP specification but not implemented in HLS.
+Contributions welcome!
+
+| Feature                | Status            | [LSP method](./what-is-hls.md#lsp-terminology) |
+| ---------------------- | ----------------- | ---------------------------------------------- |
+| Jump to declaration    | Unclear if useful | `textDocument/declaration`                     |
+| Jump to implementation | Unclear if useful | `textDocument/implementation`                  |
+| Linked editing         | Unimplemented     | `textDocument/linkedEditingRange`              |
+| Document links         | Unimplemented     | `textDocument/documentLink`                    |
+| Document color         | Unclear if useful | `textDocument/documentColor`                   |
+| Color presentation     | Unclear if useful | `textDocument/colorPresentation`               |
+| Monikers               | Unclear if useful | `textDocument/moniker`                         |</file><file path="docs/index.rst">haskell-language-server
+=======================
+
+Official Haskell Language Server implementation. :ref:`Read more&lt;What is the Haskell Language Server?&gt;`.
+
+.. toctree::
+   :maxdepth: 2
+
+   what-is-hls
+   features
+   installation
+   support/index
+   configuration
+   troubleshooting
+   contributing/index
+   components/index</file><file path="docs/installation.md"># Installation
+
+## Prerequisites
+
+- For standalone `.hs`/`.lhs` files, [ghc](https://www.haskell.org/ghc/) must be installed and on the `PATH`. The easiest way to install it is with [ghcup](https://www.haskell.org/ghcup/) or [chocolatey](https://community.chocolatey.org/packages/ghc) on Windows.
+- For Cabal based projects, both ghc and [cabal-install](https://www.haskell.org/cabal/) must be installed and on the `PATH`. It can also be installed with [ghcup](https://www.haskell.org/ghcup/) or [chocolatey](https://community.chocolatey.org/packages/cabal) on Windows.
+
+## ghcup
+
+If you are using [`ghcup`](https://www.haskell.org/ghcup/) to manage your installations, you can install `haskell-language-server` with
+
+```bash
+ghcup install hls
+```
+
+You can check if HLS is available for your platform via `ghcup` here: &lt;https://haskell.org/ghcup/install/#supported-platforms&gt;.
+
+You can also install HLS from source without checking out the code manually:
+
+```bash
+ghcup compile hls -v $HLS_VERSION --ghc $GHC_VERSION
+```
+
+More information here: &lt;https://www.haskell.org/ghcup/guide/#hls&gt;
+
+## Installation from source
+
+Direct installation from source, while possible via `cabal install exe:haskell-language-server`, is not recommended for most people.
+Said command builds the `haskell-language-server` binary and installs it in the default `cabal` binaries folder,
+but the binary will only work with projects that use the same GHC version that built it.
+
+### Common pre-requirements
+
+- `cabal` must be in your `PATH`
+  - You need `cabal` &gt;= 2.4.0.0
+- `git` must be in your `PATH`
+- The directory where `cabal` put the binaries must be in you PATH:
+  - For `cabal` it is by default `$HOME/.cabal/bin` in Linux and `%APPDATA%\cabal\bin` in windows.
+
+Tip: you can quickly check if some command is in your path by running the command.
+If you receive some meaningful output instead of &quot;command not found&quot;-like message
+then it means you have the command in `PATH`.
+
+### Linux-specific pre-requirements
+
+On Linux you will need install a couple of extra libraries:
+
+- [Unicode (ICU)](http://site.icu-project.org/)
+- [NCURSES](https://www.gnu.org/software/ncurses/)
+- [Zlib](https://zlib.net/)
+
+**Debian 9/Ubuntu 18.04 or earlier**:
+
+```bash
+sudo apt install libicu-dev libtinfo-dev libgmp-dev zlib1g-dev
+```
+
+**Debian 10/Ubuntu 18.10 or later**:
+
+```bash
+sudo apt install libicu-dev libncurses-dev libgmp-dev zlib1g-dev
+```
+
+**Fedora**:
+
+```bash
+sudo dnf install libicu-devel ncurses-devel zlib-devel
+```
+
+### Windows-specific pre-requirements
+
+In order to avoid problems with long paths on Windows you can do either one of the following:
+
+1. Clone the `haskell-language-server` to a short path, for example the root of your logical drive (e.g. to
+   `C:\hls`). Even if you choose `C:\haskell-language-server` you could hit the problem. If this doesn&apos;t work or you want to use a longer path, try the second option.
+
+2. If the `Local Group Policy Editor` is available on your system, go to: `Local Computer Policy -&gt; Computer Configuration -&gt; Administrative Templates -&gt; System -&gt; Filesystem` set `Enable Win32 long paths` to `Enabled`. If you don&apos;t have the policy editor you can use regedit by using the following instructions [here](https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file#enable-long-paths-in-windows-10-version-1607-and-later). You also need to configure git to allow longer paths by using unicode paths. To set this for all your git repositories use `git config --system core.longpaths true` (you probably need an administrative shell for this) or for just this one repository use `git config core.longpaths true`.
+
+In addition make sure `haskell-language-server.exe` is not running by closing your editor, otherwise in case of an upgrade the executable can not be installed.
+
+### Download the source code
+
+```bash
+git clone https://github.com/haskell/haskell-language-server
+cd haskell-language-server
+```
+
+## chocolatey
+
+If you are using [`chocolatey`](https://chocolatey.org/) to manage your installations in windows, [you can install `haskell-language-server`](https://community.chocolatey.org/packages/haskell-language-server) with
+
+```bash
+choco install haskell-language-server
+```
+
+## Visual Studio Code
+
+If you are using Visual Studio Code, the [Haskell extension](https://marketplace.visualstudio.com/items?itemName=haskell.haskell) will automatically download and install `haskell-language-server` for you.
+
+If you need to find the binaries, please consult the [documentation](https://github.com/haskell/vscode-haskell#downloaded-binaries) for the extension.
+
+## Pre-built binaries
+
+There are pre-built binaries available from the [releases page](https://github.com/haskell/haskell-language-server/releases) for Linux, Windows and macOS.
+To install, download the `haskell-language-server-wrapper` executable for your platform as well as any `haskell-language-server` executables for the GHC versions you plan on working with, and either put them on your `PATH` or point your client to them.
+
+## Arch Linux
+
+The preferred method of installation for development purposes is to use the [haskell-language-server-static](https://aur.archlinux.org/packages/haskell-language-server-static) package from AUR.
+This package contains pre-built binaries for each supported GHC version and `haskell-language-server-wrapper` for automatic GHC version selection.
+It is updated regularly, requires no additional dependencies, and is independent of other haskell packages you may have on your system, including GHC.
+
+See [ArchWiki](https://wiki.archlinux.org/index.php/Haskell) for the details of Haskell infrastructure on Arch Linux.
+
+## Fedora
+
+
+Binary packages for Fedora are available from [this Copr repo](https://copr.fedorainfracloud.org/coprs/petersen/haskell-language-server),
+built against the official Fedora ghc package.
+
+## FreeBSD
+
+HLS is available for installation via [devel/hs-haskell-language-server](https://www.freshports.org/devel/hs-haskell-language-server)
+port or from official binary packages. Use
+
+```bash
+pkg install hs-haskell-language-server
+```
+
+to install it. HLS installed this way targets the same GHC version that the [lang/ghc](https://www.freshports.org/lang/ghc)
+port produces. Use the `pkg search haskell-language` command to list HLS packages
+for other GHCs.
+
+## Gentoo
+
+Haskell Language Server is available via the Haskell overlay. Follow the instructions [here](https://github.com/gentoo-haskell/gentoo-haskell) to install the overlay, then run:
+
+```bash
+emerge -av dev-util/haskell-language-server
+```
+Depending on your system setup, you may need to enable the unstable flag for this package before install, and possible also for the dependencies. If you enabled the ~testing versions as explained in the gentoo-haskell overlay instructions, then this won&apos;t be necessary.
+
+## Installation from Hackage
+
+Direct installation from Hackage, while possible via `cabal install haskell-language-server`, is not recommended for most people.
+Said command builds the `haskell-language-server` binary and installs it in the default Cabal binaries folder,
+but the binary will only work with projects that use the same GHC version that built it.
+
+The package can be found here on Hackage: &lt;https://hackage.haskell.org/package/haskell-language-server&gt;
+
+## Installation via Homebrew
+
+Homebrew users can install `haskell-language-server` using the following command:
+
+```bash
+brew install haskell-language-server
+```
+
+This formula contains HLS binaries compiled with GHC versions available via Homebrew.
+
+You need to provide your own GHC/Cabal/Stack as required by your project, possibly via Homebrew.
+
+## Installation using Nix
+
+You can read full instructions on how to install HLS with Nix in the [Nixpkgs manual](https://nixos.org/manual/nixpkgs/unstable/#haskell-language-server).</file><file path="docs/Makefile"># Minimal makefile for Sphinx documentation
+
+# You can set these variables from the command line, and also
+# from the environment for the first two.
+SPHINXOPTS    ?=
+SPHINXBUILD   ?= sphinx-build
+SOURCEDIR     = .
+BUILDDIR      = _build
+
+.PHONY: Makefile
+
+html: Makefile
+	@$(SPHINXBUILD) -n -W &quot;$(SOURCEDIR)&quot; &quot;$(BUILDDIR)&quot; $(SPHINXOPTS) $(O)</file><file path="docs/requirements.txt">Sphinx~=8.1.3
+sphinx-rtd-theme~=3.0.2
+myst-parser~=4.0.0
+docutils~=0.21.2</file><file path="docs/troubleshooting.md"># Troubleshooting
+
+## Help, I have no idea what these words mean
+
+If you are new to the project, you may find it helpful to read the [introduction](./what-is-hls.md) page, which explains some of the terminology used on this page.
+
+## Getting help
+
+### Where to ask
+
+Many of the developers are active on [IRC](https://web.libera.chat/?channels=#haskell-language-server).
+However, the most direct way to get help is to open an [issue](https://github.com/haskell/haskell-language-server/issues).
+
+If you can diagnose whether a problem is with HLS or with the client that you are using, then it is helpful to open an issue in the appropriate repository.
+But this can be tricky, and if you&apos;re not sure then you can always open one in the HLS repository and we&apos;ll help you figure out what&apos;s going on.
+
+### What to include
+
+Please try and give us as much information as you can!
+In particular, the more you can diagnose the problem, the better.
+
+## Basic diagnosis steps
+
+This section lists a few basic diagnostic steps that are almost always helpful.
+
+Sometimes these checks may be enough to work out where the problem is.
+If not, refer to the sections below about diagnosing problems with the server and client, respectively.
+That will also require you to figure out is whether you are looking at an issue with the server or the client.
+This can be tricky to work out: if in doubt, open an issue and we&apos;ll help you figure it out.
+
+Typical examples of client issues:
+
+- The wrong server binary is being launched
+- Diagnostics are being shown in the wrong place
+
+Typical examples of server issues:
+
+- The server crashes on certain files
+- A code action doesn&apos;t work the way it&apos;s supposed to
+
+Unclear examples:
+
+- Hover documentation looks wrong (the client might be rendering it wrong, or the server might be sending the wrong thing)
+- Missing functionality (the client might not support it, or the server might not support it)
+
+### Finding your `haskell-language-server` binary
+
+Several of the diagnostic steps require you to run the actual `haskell-language-server` binary that is installed on your computer.
+
+Where the binary is will depend on how you installed HLS.
+Consult the [installation](./installation.md) page for help.
+
+As usual, if you installed HLS with the wrapper, you will want to run `haskell-language-server-wrapper` instead.
+
+### Getting basic information about your installation
+
+Running `haskell-language-server --probe-tools` will produce useful information, such as the version of HLS that you are using.
+Including this in issue reports is helpful.
+
+### Checking that the server is running
+
+If the server isn&apos;t running at all when you are editing a Haskell file in your project, then that suggests that the client is having difficulty launching it.
+Often this means that the client is configured to run the wrong binary, or the correct one is not available in your `PATH`.
+
+The easiest way to check whether the server is running is to use an OS process monitor to see if there is a `haskell-language-server` process running.
+
+### Checking whether the client is connecting to the server
+
+If the server is running, you should see some kind of indicator in your client.
+In some clients (e.g. `coc`) you may need to run a command to query the client&apos;s beliefs about the server state.
+If the client doesn&apos;t seem to be connected despite the server running, this may indicate a bug in the client or HLS.
+
+### Checking whether the project is being built correctly by HLS
+
+HLS needs to build the project correctly, with the correct flags, and if it does not do so then very little is likely to work.
+A typical symptom of this going wrong is &quot;incorrect&quot; compilation errors being sent to the client.
+
+If this is happening, then it usually indicates a problem in the server&apos;s configuration.
+
+### Checking whether basic functionality is working
+
+If everything otherwise seems to be fine, then it is useful to check whether basic functionality is working.
+Hover documentation (at least including type signatures) is usually a good one to try.
+
+### Identifying specific files that cause problems
+
+If possible, identifying specific files that cause problems is helpful.
+If you want to be really helpful, minimising the example can really speed up diagnosis.
+
+## Diagnosing problems with the server
+
+### Examining the server log
+
+Most clients will launch `haskell-language-server` with `--logfile` to make it write a log file.
+Please consult the documentation for your client to find out where this is (or how to set it).
+
+The log will contain all the messages that are sent to the server and its responses.
+This is helpful for low-level debugging: if you expect a certain action to happen, you can look in the log to see if the corresponding messages are sent, or if there are any errors.
+
+To get a more verbose log, you can also pass the `--debug` argument to the server.
+
+### Reproducing failures on the command-line
+
+The `haskell-language-server` binary can be run from the command line.
+
+If it is run with a specific file as an argument, it will try and load that file specifically.
+If it is run without a specific file, it will try and load all the files in the project.
+
+If you are having trouble loading one or many files in the editor, then testing it this way can help make the failure more obvious and reproducible.
+
+Running HLS from the command-line directly also provides an easy way to get the logs (with or without `--debug`).
+
+### Plugin-related issues
+
+Sometimes the issue is related to one of HLS&apos;s plugins.
+One strategy for diagnosing this is simply disable all plugins, check if the issue is gone and then enable them selectively until the issue is reproduced again.
+
+There is a configuration JSON snippet which disables all plugins [here](https://github.com/haskell/haskell-language-server/issues/2151#issuecomment-911397030).
+
+### Clearing HLS&apos;s build cache
+
+HLS builds the dependencies of your project in a separate directory to avoid clashing with your normal build tools.
+Sometimes clearing this out can help if you have persistent build problems.
+The cache directory is at `$HOME/.cache/hie-bios`.
+You may be able to identify a specific subdirectory that relates to your project, but it should always be safe to delete the whole thing, at worst it will cause HLS to redo build work next time it opens a project.
+
+## Diagnosing problems with the client
+
+The most important thing to do is to consult the client&apos;s documentation.
+Usually this will provide some information about troubleshooting.
+
+For example:
+
+- `lsp-mode` has a [troubleshooting page](https://emacs-lsp.github.io/lsp-mode/page/troubleshooting/)
+- The VSCode Haskell extension has a [troubleshooting section](https://github.com/haskell/vscode-haskell#investigating-and-reporting-problems)
+
+Many clients provide diagnostic information about a LSP session.
+In particular, look for a way to get the status of the server, the server stderr, or a log of the messages that the client has sent to the server.
+
+## Common issues
+
+### Wrong server binary being used
+
+HLS needs to be compiled against the same version of GHC as is used in the project.
+Normally, we ship binaries for multiple versions and `haskell-language-server-wrapper` selects the correct one.
+
+If you see an error about HLS being compiled with the wrong version of GHC, then you either need to install the correct one (if you installed it yourself), or there is something going wrong with the wrapper selecting the right HLS binary to launch.
+
+### Unsupported GHC version or missing binaries
+
+HLS does not support every GHC version - there are a lot of them!
+Please see the [supported versions page](./support/ghc-version-support.md) for more information, including what to do if you need binaries for a version that is not yet supported by a HLS release.
+
+### Missing server or build tools
+
+The most common client-related problem is the client simply not finding the server executable or the tools needed to load Haskell code (`ghc`, `cabal`, or `stack`). So make sure that you have the right `PATH` and you have configured the client to look for the right executables.
+
+Usually this will be visible in the client&apos;s log.
+
+### Compilation failures
+
+Sometimes HLS will simply fail to do anything with a file, or give nonsensical error messages.
+The most common cause of this is that HLS is using the wrong `hie-bios` cradle to decide how to build the project (e.g., trying to use `stack` instead of `cabal`).
+The server log will show which cradle is being chosen.
+
+Using an explicit `hie.yaml` to configure the cradle can resolve the problem, see the [configuration page](./configuration.md#configuring-your-project-build).
+
+### Multi Cradle: No prefixes matched
+The error message `Multi Cradle: No prefixes matched` usually means that implicit configuration failed.
+In that case, you must use [explicit configuration](./configuration.md#configuring-your-project-build).
+
+### Static binaries
+
+Static binaries use the GHC linker for dynamically loading dependencies when typechecking Template Haskell code, and this can run into issues when loading shared objects linked against mismatching system libraries, or into GHC linker  bugs (mainly the Mach linker used in Mac OS, but also potentially the ELF linker).
+Dynamically linked binaries (including`ghci`) use the system linker instead of the GHC linker and avoid both issues.
+
+The easiest way to obtain a dynamically linked HLS binary is to build HLS locally. With `cabal` this can be done as follows:
+
+```bash
+cabal update &amp;&amp; cabal install :pkg:haskell-language-server
+```
+
+Or with `stack`:
+
+```bash
+stack install haskell-language-server
+```
+
+You also can leverage `ghcup compile hls`:
+
+```bash
+ghcup compile hls -v 2.9.0.0 --ghc 9.6.5
+```
+
+### Preprocessors
+
+HLS is [not yet](https://github.com/haskell/haskell-language-server/issues/176) able to find project preprocessors, which may result in `could not execute: &lt;preprocessor&gt;` errors.
+
+As a workaround, you can ensure the preprocessor is available in `PATH` (install globally with Stack or Cabal, provide in `shell.nix`, etc.).
+
+Example with `tasty-discover`:
+
+```haskell
+{-# OPTIONS_GHC -F -pgmF tasty-discover #-}
+```
+
+This returns an error in HLS if `tasty-discover` is not in the path: `could not execute: tasty-discover`.
+
+### Problems with multi component support using stack
+
+Due to some limitations in the interaction between HLS and `stack`, there are [issues](https://github.com/haskell/haskell-language-server/issues/366) in projects with multiple components (i.e. a main library and executables, test suites or benchmarks):
+
+- The project has to be built successfully *before* loading it with HLS to get components other than the library work.
+- Changes in the library are not automatically propagated to other components, especially in the presence of errors in the library. So you have to restart HLS in order for those components to be loaded correctly. The usual symptom is the editor showing errors like `Could not load module ...` or `Cannot satisfy -package ...`.</file><file path="docs/what-is-hls.md"># What is the Haskell Language Server?
+
+The Haskell Language Server (HLS) is an implementation of a server (a &quot;language server&quot;) for the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) (LSP).
+A language server talks to a client (typically an editor), which can ask the server to perform various operations, such as reporting errors or providing code completions.
+The advantage of this system is that clients and servers can interoperate more easily so long as they all speak the LSP protocol.
+In the case of HLS, that means that it can be used with many different editors, since editor support for the LSP protocol is now widespread.
+
+## Language Server Protocol
+
+### Servers and clients
+
+HLS is responsible for actually understanding your project and answering the questions that the client asks of it, such as: what completion items could go here? are there any errors in the project? and so on.
+HLS provides [many](./features.md) (but not all) of the features that the LSP protocol supports.
+
+But HLS only provides the server part of the setup.
+In order to actually use it you also need a client (editor).
+The client is responsible for managing your interaction with the server: launching it, dispatching commands to it, and displaying or implementing responses.
+Some clients will even install the server binaries for you!
+
+Common clients include:
+- VSCode (the reference implementation for a LSP client)
+- Emacs, with the `lsp-mode`+`lsp-haskell` or `eglot` packages
+- Vim/neovim, with the builtin LSP support or `coc.vim`
+- Kate
+- ... and more every day!
+
+### LSP terminology
+
+Here are a few pieces of jargon that you may come across in the HLS docs or when discussing problems:
+
+- *Code action*: A code action is a specific action triggered by a user on a particular region of code. Examples might include &quot;add a type signature to this function&quot;.
+- *Code lens*: A pre-rendered edit or action shown in the body of the document itself, usually triggered with a click. Examples might include &quot;the type signature for a function, which is actually inserted on click&quot;.
+- *Completion item*: An item that can be inserted into the text, including its metadata.
+- *Diagnostic*: Any information about the project that is shown in the editor, including errors, warnings, and hints from tools such as hlint.
+- *Semantic highlighting*: Special syntax highlighting performed by the server.
+- *Method*: A LSP method is a function in the LSP protocol that the client can invoke to perform some action, e.g. ask for completions at a point.
+
+## Haskell Language Server
+
+### HLS and its wrapper
+
+HLS is a binary that must be compiled with the same version of GHC as the project you are using it on.
+For this reason it is usually distributed as a _collection_ of binaries, along with a `haskell-language-server-wrapper` executable that selects the correct one based on which version of GHC it thinks you are using.
+
+In general you can use `haskell-language-server-wrapper` wherever you need to run `haskell-language-server`.
+
+### HLS plugins
+
+HLS has a plugin architecture, whereby individual pieces of functionality are provided by smaller packages that just do one thing.
+Plugins can also be disabled independently to allow users to customize the behaviour of HLS to their liking.
+
+These plugins all (currently) live in the HLS repository and are developed in tandem with the core HLS functionality.
+
+See the [configuration page](./configuration.md#Generic plugin configuration) for more on configuring plugins.
+
+### hie-bios
+
+HLS needs to know how to build your Haskell project: what flags to pass, what packages to provide, etc.
+It gets this information from the build system used by your project (typically `cabal` or `stack`).
+The tool used to do this is called [`hie-bios`](https://github.com/haskell/hie-bios).
+`hie-bios` calls the strategy it uses to get compilation flags (e.g. &quot;ask `cabal`&quot;) a &quot;cradle&quot;.
+
+See the [configuration page](./configuration.md#configuring-your-project-build) for more on configuring cradles.</file></files></repomix>

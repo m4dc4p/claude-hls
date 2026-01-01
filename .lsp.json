@@ -1,0 +1,13 @@
+{
+  "haskell": {
+    "command": "haskell-language-server-wrapper",
+    "args": ["--lsp"],
+    "extensionToLanguage": {
+      ".hs": "haskell",
+      ".lhs": "haskell"
+    },
+    "loggingConfig": {
+      "args": ["--debug", "--logfile", "${CLAUDE_PLUGIN_LSP_LOG_FILE}"]
+    }
+  }
+}

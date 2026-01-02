@@ -1,0 +1,15 @@
+{
+  "name": "claude-hls",
+  "owner": {
+    "name": "Justin Bailey",
+    "email": "jgbailey@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "hls",
+      "source": "..",
+      "description": "Haskell Language Server integration for Claude Code",
+      "category": "development"
+    }
+  ]
+}

@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Haskell Language Server (HLS) integration for Claude Code with LSP support and troubleshooting guidance",
   "author": {
-    "name": "Justin"
-  }
+    "name": "Justin Bailey",
+    "email": "jgbailey@gmail.com"
+  },
+  "homepage": "https://github.com/m4dc4p/claude-hls",
+  "repository": "https://github.com/m4dc4p/claude-hls",
+  "license": "MIT"
 }

@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "hls",
-      "source": "..",
+      "source": "./",
       "description": "Haskell Language Server integration for Claude Code",
       "category": "development"
     }
